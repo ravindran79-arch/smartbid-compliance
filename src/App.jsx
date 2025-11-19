@@ -15,7 +15,7 @@ import {
 
 // --- CONSTANTS ---
 const API_MODEL = "gemini-2.5-flash-preview-09-2025";
-const API_KEY = ""; // Kept empty; provided by the environment
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // <-- This line is the fix
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${API_KEY}`;
 
 // --- ENUM for Compliance Category ---
