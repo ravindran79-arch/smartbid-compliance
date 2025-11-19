@@ -461,7 +461,7 @@ function App() {
     // --- EFFECT 1: Firebase Initialization and Auth ---
     useEffect(() => {
         try {
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
     
             if (Object.keys(firebaseConfig).length === 0) {
