@@ -21,22 +21,6 @@ const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${API_M
 // --- ENUM for Compliance Category ---
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
 
-// --- SUBSCRIPTION / TRIAL MOCK CONFIG ---
-const TRIAL_LIMIT = 3;            // 3 free audits per user (mock)
-const MONTHLY_PRICE_USD = 10;
-const YEARLY_PRICE_USD = 100;
-const MONTHLY_AUDITS = 30;        // audits/month when subscribed monthly
-const YEARLY_AUDITS = 500;        // audits/year when subscribed yearly
-
-// Helper to calculate remaining audits for a mock user object
-const getMockAuditsLeft = (userObj) => {
-    if (!userObj) return 0;
-    if (typeof userObj.auditsLeft === 'number') return userObj.auditsLeft;
-    return Math.max(0, TRIAL_LIMIT - (userObj.usedTrials || 0));
-};
-
-
-
 // --- APP ROUTING ENUM (RBAC Enabled) ---
 const PAGE = {
     HOME: 'HOME',
@@ -302,19 +286,14 @@ const AuthPage = ({
         setTimeout(() => {
             // --- UPDATED: Save all registration details ---
             const newUser = {
-        password: regForm.password,
-        name: regForm.name,
-        role: "USER", // All new registrations are standard users
-        designation: regForm.designation, 
-        company: regForm.company,         
-        email: regForm.email,             
-        phone: regForm.phone,
-        // mock billing/usage defaults
-        plan: "FREE",
-        usedTrials: 0,
-        auditsLeft: undefined,
-        reports: []
-    };
+                password: regForm.password,
+                name: regForm.name,
+                role: "USER", // All new registrations are standard users
+                designation: regForm.designation, 
+                company: regForm.company,         
+                email: regForm.email,             
+                phone: regForm.phone,             
+            };
             setMockUsers(prev => ({
                 ...prev,
                 [regForm.login]: newUser
@@ -460,25 +439,10 @@ function App() {
 
     // --- MOCK AUTH STATE (Now a multi-user object - UPDATED DEFAULT USER DATA) ---
     const [mockUsers, setMockUsers] = useState({
-        "myuser": { 
-            password: "123", name: "My", role: "USER", designation: "Procurement Analyst", 
-            company: "BidCorp", email: "myuser@demo.com", phone: "555-1234",
-            // Mock billing/usage
-            plan: "FREE", // FREE | MONTHLY | YEARLY | ADMIN (admin handled via role)
-            usedTrials: 0,
-            auditsLeft: undefined, // undefined -> calculated from usedTrials for FREE
-            reports: [] // local history for mock mode (when no db)
-        },
-        "auditor": { 
-            password: "456", name: "Auditor", role: "USER", designation: "Junior Analyst", 
-            company: "AuditCo", email: "auditor@demo.com", phone: "555-9012",
-            plan: "FREE", usedTrials: 0, auditsLeft: undefined, reports: []
-        }, 
-        "admin": { 
-            password: "pass", name: "System", role: "ADMIN", designation: "Lead Administrator", 
-            company: "SmartBids Inc", email: "admin@smartbids.com", phone: "555-5678",
-            plan: "ADMIN", usedTrials: 0, auditsLeft: Infinity, reports: []
-        }
+        "myuser": { password: "123", name: "My", role: "USER", designation: "Procurement Analyst", company: "BidCorp", email: "myuser@demo.com", phone: "555-1234" },
+        // --- ADDED NEW USER: auditor/456 ---
+        "auditor": { password: "456", name: "Auditor", role: "USER", designation: "Junior Analyst", company: "AuditCo", email: "auditor@demo.com", phone: "555-9012" }, 
+        "admin": { password: "pass", name: "System", role: "ADMIN", designation: "Lead Administrator", company: "SmartBids Inc", email: "admin@smartbids.com", phone: "555-5678" }
     });
     const [currentUser, setCurrentUser] = useState(null); // { login, name, role }
 
@@ -669,38 +633,14 @@ function App() {
 
     // --- CORE LOGIC: Compliance Analysis ---
     const handleAnalyze = useCallback(async (role) => {
-    const roleKey = role === 'INITIATOR' ? 'initiatorChecks' : 'bidderChecks';
-    
-    if (!RFQFile || !BidFile) {
-        setErrorMessage("Please upload both the RFQ and the Bid documents.");
-        return;
-    }
-
-    // RBAC + Mock-enforcement BEFORE running the heavy AI call
-    const login = currentUser?.login; // currentUser set at login
-    if (!currentUser) {
-        setErrorMessage("You must be logged in to run audits in this mock test.");
-        return;
-    }
-
-    // Admin bypass
-    if (currentUser.role !== 'ADMIN') {
-        const check = canRunAudit(login);
-        if (!check.ok) {
-            if (check.reason === 'trial_exhausted') {
-                setErrorMessage(`Free trial exhausted. Upgrade to continue: $${MONTHLY_PRICE_USD}/month (30 audits) or $${YEARLY_PRICE_USD}/year (500 audits).`);
-            } else if (check.reason === 'quota_exhausted') {
-                setErrorMessage(`Quota exhausted. Upgrade to continue: $${MONTHLY_PRICE_USD}/month (30 audits) or $${YEARLY_PRICE_USD}/year (500 audits).`);
-            } else {
-                setErrorMessage("Quota exceeded. Please upgrade to continue.");
-            }
+        const roleKey = role === 'INITIATOR' ? 'initiatorChecks' : 'bidderChecks';
+        
+        if (!RFQFile || !BidFile) {
+            setErrorMessage("Please upload both the RFQ and the Bid documents.");
             return;
         }
-    }
 
-    setLoading(true);
-    setReport(null);
-    setErrorMessage(null);
+        setLoading(true);
         setReport(null);
         setErrorMessage(null);
 
@@ -820,51 +760,62 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
 
     // --- CORE LOGIC: Save Report ---
     const saveReport = useCallback(async (role) => {
-        if (!report) {
-            setErrorMessage("No report to save.");
+        if (!db || !userId || !report) {
+            setErrorMessage("Database not ready or no report to save.");
             return;
         }
-
         setSaving(true);
         try {
-            if (db && userId) {
-                const reportsRef = getReportsCollectionRef(db, userId);
-                await addDoc(reportsRef, {
-                    ...report,
-                    rfqName: RFQFile?.name || 'Untitled RFQ',
-                    bidName: BidFile?.name || 'Untitled Bid',
-                    timestamp: Date.now(),
-                    role: role, // Save the role used for the audit
-                });
-                setErrorMessage("Report saved successfully to history!");
-                setTimeout(() => setErrorMessage(null), 3000);
-            } else if (currentUser && mockUsers[currentUser.login]) {
-                setMockUsers(prev => {
-                    const u = prev[currentUser.login];
-                    const copy = { ...u };
-                    copy.reports = copy.reports || [];
-                    copy.reports.unshift({
-                        id: `mock-${Date.now()}`,
-                        ...report,
-                        rfqName: RFQFile?.name || 'MOCK_RFQ',
-                        bidName: BidFile?.name || 'MOCK_BID',
-                        timestamp: Date.now(),
-                        role
-                    });
-                    return { ...prev, [currentUser.login]: copy };
-                });
-                setErrorMessage("Report saved to mock-history (in-memory).");
-                setTimeout(() => setErrorMessage(null), 3000);
-            } else {
-                setErrorMessage("Database not ready and no logged-in mock user to save report.");
-            }
+            const reportsRef = getReportsCollectionRef(db, userId);
+            
+            await addDoc(reportsRef, {
+                ...report,
+                rfqName: RFQFile?.name || 'Untitled RFQ',
+                bidName: BidFile?.name || 'Untitled Bid',
+                timestamp: Date.now(),
+                role: role, // Save the role used for the audit
+            });
+            
+            setErrorMessage("Report saved successfully to history!"); 
+            setTimeout(() => setErrorMessage(null), 3000);
+
         } catch (error) {
             console.error("Error saving report:", error);
             setErrorMessage(`Failed to save report: ${error.message}`);
         } finally {
             setSaving(false);
         }
-    }, [db, userId, report, RFQFile, BidFile, currentUser, mockUsers]);
+    }, [db, userId, report, RFQFile, BidFile]);
+    
+    // --- CORE LOGIC: Delete Report ---
+    // NOTE: This function remains for ADMIN use. Its button rendering is restricted.
+    const deleteReport = useCallback(async (reportId, rfqName, bidName) => {
+        if (!db || !userId) {
+            setErrorMessage("Database not ready.");
+            return;
+        }
+        setErrorMessage(`Deleting report: ${rfqName} vs ${bidName}...`);
+        
+        try {
+            const reportsRef = getReportsCollectionRef(db, userId);
+            const docRef = doc(reportsRef, reportId);
+            
+            // Perform the deletion
+            await deleteDoc(docRef);
+
+            // Clear any currently loaded report if it's the one being deleted
+            if (report && report.id === reportId) {
+                setReport(null);
+            }
+            
+            setErrorMessage("Report deleted successfully!");
+            setTimeout(() => setErrorMessage(null), 3000);
+
+        } catch (error) {
+            console.error("Error deleting report:", error);
+            setErrorMessage(`Failed to delete report: ${error.message}`);
+        }
+    }, [db, userId, report]);
 
 
     const loadReportFromHistory = useCallback((historyItem) => {
@@ -1144,58 +1095,6 @@ const AdminDashboard = ({ setCurrentPage, currentUser, usageLimits, reportsHisto
     );
 };
 
-// --- MOCK: Check whether current user can run an audit (client-side mock enforcement) ---
-const canRunAudit = (login) => {
-    if (!login) return { ok: false };
-    const user = mockUsers[login];
-    if (!user) return { ok: false };
-    if (user.role === 'ADMIN') return { ok: true };
-    if (user.plan === 'MONTHLY' || user.plan === 'YEARLY') {
-        const left = getMockAuditsLeft(user);
-        if (left > 0) return { ok: true, auditsLeft: left };
-        return { ok: false, reason: 'quota_exhausted', auditsLeft: 0 };
-    }
-    const used = user.usedTrials || 0;
-    if (used < TRIAL_LIMIT) {
-        return { ok: true, trialsLeft: TRIAL_LIMIT - used };
-    }
-    return { ok: false, reason: 'trial_exhausted', trialsLeft: 0 };
-};
-
-// --- MOCK: apply a simulated upgrade for a mock user (updates mockUsers state) ---
-const applyMockUpgrade = (login, plan) => {
-    setMockUsers(prev => {
-        const user = prev[login];
-        if (!user) return prev;
-        const copy = { ...user };
-        if (plan === 'MONTHLY') {
-            copy.plan = 'MONTHLY';
-            copy.auditsLeft = MONTHLY_AUDITS;
-        } else if (plan === 'YEARLY') {
-            copy.plan = 'YEARLY';
-            copy.auditsLeft = YEARLY_AUDITS;
-        }
-        copy.usedTrials = 0;
-        return { ...prev, [login]: copy };
-    });
-};
-
-// --- MOCK: decrement mock usage when an audit runs (for mockUsers) ---
-const decrementMockUsage = (login) => {
-    setMockUsers(prev => {
-        const user = prev[login];
-        if (!user) return prev;
-        const copy = { ...user };
-        if (copy.role === 'ADMIN') return prev;
-        if (copy.plan === 'MONTHLY' || copy.plan === 'YEARLY') {
-            copy.auditsLeft = (typeof copy.auditsLeft === 'number') ? Math.max(0, copy.auditsLeft - 1) : 0;
-        } else {
-            copy.usedTrials = (copy.usedTrials || 0) + 1;
-        }
-        return { ...prev, [login]: copy };
-    });
-};
-
 // --- StatCard sub-component for AdminDashboard ---
 const StatCard = ({ icon, label, value }) => (
     <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 flex items-center space-x-4">
@@ -1275,38 +1174,6 @@ const AuditPage = ({
                     LOAD DEMO DOCUMENTS
                 </button>
 
-
-                {/* --- MOCK: Paywall / Upgrade Controls (visible to non-admin users) --- */}
-                {currentUser && currentUser.role !== 'ADMIN' && (
-                    <div className="mb-4 p-4 bg-slate-700/40 border border-amber-600 rounded-xl text-sm">
-                        <p className="text-slate-300 mb-2">
-                            Plan: <span className="font-semibold text-amber-300">{mockUsers[currentUser.login]?.plan || 'FREE'}</span>
-                            {' '}| Audits left: <span className="font-semibold text-green-300">{getMockAuditsLeft(mockUsers[currentUser.login])}</span>
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    applyMockUpgrade(currentUser.login, 'MONTHLY');
-                                    setErrorMessage(`Upgraded mock account to MONTHLY. You now have ${MONTHLY_AUDITS} audits.`);
-                                    setTimeout(() => setErrorMessage(null), 3000);
-                                }}
-                                className="px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm"
-                            >
-                                Upgrade $10/month — 30 audits
-                            </button>
-                            <button
-                                onClick={() => {
-                                    applyMockUpgrade(currentUser.login, 'YEARLY');
-                                    setErrorMessage(`Upgraded mock account to YEARLY. You now have ${YEARLY_AUDITS} audits.`);
-                                    setTimeout(() => setErrorMessage(null), 3000);
-                                }}
-                                className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
-                            >
-                                Upgrade $100/year — 500 audits
-                            </button>
-                        </div>
-                    </div>
-                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <FileUploader
                         title={rfqTitle}
