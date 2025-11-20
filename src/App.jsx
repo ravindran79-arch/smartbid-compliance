@@ -352,15 +352,7 @@ const AuthPage = ({
                 AI-Driven Bid Compliance Audit: Smarter Bids, Every Time!
             </p>
             
-            <div className="text-center mb-6 p-3 rounded-xl bg-green-900/40 border border-green-700">
-                <p className="text-green-400 text-sm font-semibold">
-                    {authStatusText} (Uninterrupted Testing Mode)
-                </p>
-                <p className="text-amber-400 text-xs mt-1">
-                    **Unified Login Active. (Try admin/pass, myuser/123, or auditor/456)**
-                </p>
-            </div>
-
+           
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* --- Section 1: New User Registration --- */}
                 <div className="p-6 bg-slate-700/50 rounded-xl border border-blue-500/50 shadow-inner space-y-4">
