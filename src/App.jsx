@@ -818,8 +818,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     userId={userId} 
                     isAuthReady={isAuthReady}
                     errorMessage={errorMessage}
-                    mockUsers={mockUsers}
-                    setMockUsers={setMockUsers}
                     setCurrentUser={setCurrentUser}
                 />;
             case PAGE.COMPLIANCE_CHECK:
@@ -851,8 +849,7 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     currentUser={currentUser}
                     usageLimits={usageLimits}
                     reportsHistory={reportsHistory}
-                    allMockUsers={mockUsers} // Passing the full mock users list
-                />;
+                    />;
             case PAGE.HISTORY:
                 return <ReportHistory 
                     reportsHistory={reportsHistory} 
@@ -870,8 +867,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     userId={userId} 
                     isAuthReady={isAuthReady}
                     errorMessage={errorMessage}
-                    mockUsers={mockUsers}
-                    setMockUsers={setMockUsers}
                     setCurrentUser={setCurrentUser}
                 />;
         }
@@ -963,15 +958,52 @@ const UserCard = ({ user }) => (
 
 
 // --- NEW AdminDashboard Component ---
-const AdminDashboard = ({ setCurrentPage, currentUser, usageLimits, reportsHistory, allMockUsers }) => {
+import { useEffect, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase"; // adjust path as needed
+
+const AdminDashboard = ({ setCurrentPage, currentUser, usageLimits, reportsHistory }) => {
     const totalAudits = (usageLimits.initiatorChecks || 0) + (usageLimits.bidderChecks || 0);
     const recentReports = reportsHistory.slice(0, 5); // Get 5 most recent
-    
-    // Process mock users into an array for easy rendering
-    const userList = Object.entries(allMockUsers).map(([login, details]) => ({
-        login,
-        ...details
-    }));
+
+    // Fetch real users from Firebase Firestore
+    const [userList, setUserList] = useState([]);
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const snapshot = await getDocs(collection(db, "users"));
+                const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setUserList(users);
+            } catch (err) {
+                console.error("Error fetching users:", err);
+            }
+        };
+        fetchUsers();
+    }, []);
+
+    return (
+        <div>
+            <h1>Admin Dashboard</h1>
+            <p>Total audits: {totalAudits}</p>
+            <h2>Recent Reports</h2>
+            <ul>
+                {recentReports.map((report, idx) => (
+                    <li key={idx}>{report.title || "Untitled Report"}</li>
+                ))}
+            </ul>
+
+            <h2>Users</h2>
+            <ul>
+                {userList.map(user => (
+                    <li key={user.id}>{user.email || user.name}</li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+export default AdminDashboard;
     
     return (
         <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl shadow-black/50 border border-slate-700 space-y-8">
