@@ -421,23 +421,7 @@ function App() {
             signIn();
             setAuth(newAuth); 
 
-            const signIn = async () => {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(newAuth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(newAuth);
-                    }
-                } catch (error) {
-                    console.error("Firebase Sign-In Failed:", error);
-                }
-            };
-
-            const unsubscribeAuth = onAuthStateChanged(newAuth, (user) => {
-                const currentUserId = user?.uid || null;
-                setUserId(currentUserId);
-                setIsAuthReady(true);
-            });
+           
 
             signIn();
             return () => unsubscribeAuth();
