@@ -957,11 +957,6 @@ const UserCard = ({ user }) => (
 );
 
 
-// --- NEW AdminDashboard Component ---
-import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../firebase"; // adjust path as needed
-
 const AdminDashboard = ({ setCurrentPage, currentUser, usageLimits, reportsHistory }) => {
     const totalAudits = (usageLimits.initiatorChecks || 0) + (usageLimits.bidderChecks || 0);
     const recentReports = reportsHistory.slice(0, 5); // Get 5 most recent
