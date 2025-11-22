@@ -366,71 +366,79 @@ function App() {
     });
 
     // --- EFFECT 1: Firebase Initialization and Auth ---
-    useEffect(() => {
-        try {
-            const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
-            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-    
-            if (Object.keys(firebaseConfig).length === 0) {
-                setIsAuthReady(true);
-                return;
-            }
+  useEffect(() => {
+  try {
+    const firebaseConfig = {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: import.meta.env.VITE_FIREBASE_APP_ID
+    };
 
-            const app = initializeApp(firebaseConfig);
-            const newAuth = getAuth(app);
-            const newDb = getFirestore(app);
+    const hasConfig = Object.values(firebaseConfig).some(v => v);
+    if (!hasConfig) {
+      console.warn("Firebase config missing — skipping initialization.");
+      setIsAuthReady(true);
+      return;
+    }
 
-            setDb(newDb);
+    // SAFE LINE – leave it exactly like this
+    const initialAuthToken =
+      typeof __initial_auth_token !== "undefined" ? __initial_auth_token : null;
 
-            setDb(newDb);
-            setAuth(newAuth);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const newAuth = getAuth(app);
+    const newDb = getFirestore(app);
 
-            const signIn = async () => {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(newAuth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(newAuth);
-                    }
-                } catch (error) {
-                    console.error("Firebase Sign-In Failed:", error);
-                }
-            };
+    setDb(newDb);
+    setAuth(newAuth);
 
-            const unsubscribeAuth = onAuthStateChanged(newAuth, async (user) => {
-                const uid = user?.uid || null;
-                setUserId(uid);
-                setIsAuthReady(true);
-
-                if (uid && newDb) {
-                    try {
-                        const userDoc = await getDoc(doc(newDb, 'users', uid));
-                        if (userDoc.exists()) {
-                            setCurrentUser({ uid, ...userDoc.data() });
-                        } else {
-                            setCurrentUser({ uid, role: 'ANONYMOUS' });
-                        }
-                    } catch (e) {
-                        console.error('Error loading user profile:', e);
-                    }
-                } else {
-                    setCurrentUser(null);
-                }
-            });
-
-            signIn();
-            setAuth(newAuth); 
-
-           
-
-            signIn();
-            return () => unsubscribeAuth();
-
-        } catch (e) {
-            console.error("Error initializing Firebase:", e);
-            setIsAuthReady(true);
+    const signIn = async () => {
+      try {
+        if (initialAuthToken) {
+          await signInWithCustomToken(newAuth, initialAuthToken);
+        } else {
+          await signInAnonymously(newAuth);
         }
-    }, []); 
+      } catch (error) {
+        console.error("Sign-in failed:", error);
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(newAuth, async (user) => {
+      const uid = user?.uid || null;
+      setUserId(uid);
+      setIsAuthReady(true);
+
+      if (uid && newDb) {
+        try {
+          const docRef = doc(newDb, "users", uid);
+          const userDoc = await getDoc(docRef);
+
+          if (userDoc.exists()) {
+            setCurrentUser({ uid, ...userDoc.data() });
+          } else {
+            setCurrentUser({ uid, role: "ANONYMOUS" });
+          }
+        } catch (e) {
+          console.error("Error loading user profile:", e);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    signIn();
+    return () => unsubscribe();
+
+  } catch (e) {
+    console.error("Error initializing Firebase:", e);
+    setIsAuthReady(true);
+  }
+}, []);
 
     // --- EFFECT 2: Load/Initialize Usage Limits (Scoped by userId) ---
     useEffect(() => {
@@ -1644,3 +1652,4 @@ function TopLevelApp() {
 }
 
 export default TopLevelApp;
+f
