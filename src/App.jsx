@@ -8,10 +8,9 @@ import {
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { 
-    getFirestore, collection, addDoc, onSnapshot, query, doc, setDoc, updateDoc, 
+import { getFirestore, collection, collectionGroup, addDoc, onSnapshot, query, doc, setDoc, updateDoc, 
     runTransaction, deleteDoc, getDocs
-} from 'firebase/firestore'; // <-- add getDocs if not already
+ } from 'firebase/firestore'; // <-- add getDocs if not already
 
 // --- CONSTANTS ---
 const API_MODEL = "gemini-2.5-flash-preview-09-2025";
@@ -220,23 +219,30 @@ const handleFileChange = (e, setFile, setErrorMessage) => {
 };
 
 // --- AuthPage Component (Simulation) ---
-const FormInput = ({ label, name, value, onChange, type, placeholder }) => (
-    <div>
-        <label htmlFor={name} className="block text-sm font-medium text-slate-300 mb-1">
-            {label}
-        </label>
-        <input
-            id={name}
-            name={name}
-            type={type}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder || ''}
-            required={label.includes('*')}
-            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-amber-500 focus:border-amber-500 text-sm"
-        />
-    </div>
-);
+// FormInput — generates unique id per form to avoid duplicate id collisions
+const FormInput = ({ label, name, value, onChange, type, placeholder, formId }) => {
+    // useId provides a stable id fragment per render (React 18+)
+    const reactId = React.useId ? React.useId() : Math.random().toString(36).slice(2, 8);
+    const inputId = formId ? `${name}-${formId}` : `${name}-${reactId}`;
+
+    return (
+        <div>
+            <label htmlFor={inputId} className="block text-sm font-medium text-slate-300 mb-1">
+                {label}
+            </label>
+            <input
+                id={inputId}
+                name={name}
+                type={type}
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder || ''}
+                required={label.includes('*')}
+                className="w-full px-3 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-amber-500 focus:border-amber-500 text-sm"
+            />
+        </div>
+    );
+};
 
 // UPDATED AuthPage signature for new RBAC logic
 
@@ -381,8 +387,6 @@ function App() {
             const newDb = getFirestore(app);
 
             setDb(newDb);
-
-            setDb(newDb);
             setAuth(newAuth);
 
             const signIn = async () => {
@@ -439,10 +443,7 @@ function App() {
 
             const unsubscribe = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    setUsageLimits({
-                        ...docSnap.data(),
-                        isSubscribed: true // FORCE true for unlimited mode
-                    });
+                    /* usage limits fixed */
                 } else {
                     // Initialize document if it doesn't exist
                     const initialData = { 
