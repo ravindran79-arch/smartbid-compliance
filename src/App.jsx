@@ -1088,7 +1088,6 @@ export default AdminDashboard;
             </div>
         </div>
     );
-};
 
 // --- StatCard sub-component for AdminDashboard ---
 const StatCard = ({ icon, label, value }) => (
