@@ -904,7 +904,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
             </div>
         </div>
     );
-}
 
 // --- DetailItem for consistent user card styling ---
 const DetailItem = ({ icon: Icon, label, value }) => (
