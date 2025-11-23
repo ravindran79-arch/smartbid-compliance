@@ -379,18 +379,22 @@ const App = () => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid);
+                
+                // FIX 1: Navigate IMMEDIATELY. Do not wait for database fetch.
+                // This ensures you never get stuck on "Login Successful"
+                setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
+
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
-                    // Check if doc exists, otherwise fallback
-                    const userData = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : { uid: user.uid, role: 'USER' };
-                    
-                    setCurrentUser(userData);
-                    
-                    // FIX: Use functional state update to safely navigate from HOME
-                    // This prevents the infinite loop/refresh issues
-                    setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
+                    if (userDoc.exists()) {
+                        setCurrentUser({ uid: user.uid, ...userDoc.data() });
+                    } else {
+                        setCurrentUser({ uid: user.uid, role: 'USER' });
+                    }
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
+                    // FIX 2: Even if database fails, ensure we have a basic user set
+                    setCurrentUser({ uid: user.uid, role: 'USER' });
                 }
             } else {
                 setUserId(null);
@@ -401,7 +405,7 @@ const App = () => {
         });
 
         return () => unsubscribe();
-    }, []); // <--- IMPORTANT: This must be an empty array [], NOT [currentPage]
+    }, []);
 
     // --- EFFECT 2: Usage Limits Listener ---
     useEffect(() => {
