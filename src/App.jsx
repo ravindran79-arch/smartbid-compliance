@@ -17,7 +17,6 @@ import {
 } from 'firebase/firestore'; 
 
 // --- FIREBASE INITIALIZATION ---
-// STRICT: Using import.meta.env as required
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -31,7 +30,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-
 // --- CONSTANTS ---
 const API_MODEL = "gemini-2.5-flash-preview-09-2025";
 const API_KEY = import.meta.env.VITE_API_KEY; 
@@ -40,7 +38,7 @@ const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${API_M
 // --- ENUM for Compliance Category ---
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
 
-// --- APP ROUTING ENUM (RBAC Enabled) ---
+// --- APP ROUTING ENUM ---
 const PAGE = {
     HOME: 'HOME',
     COMPLIANCE_CHECK: 'COMPLIANCE_CHECK', 
@@ -48,7 +46,7 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- JSON Schema for the Comprehensive Report ---
+// --- JSON Schema ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report, including a high-level summary and detailed requirement findings.",
@@ -98,7 +96,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
     "propertyOrdering": ["executiveSummary", "findings"]
 };
 
-// --- Utility Function for API Call with Retry Logic ---
+// --- API Utility ---
 const fetchWithRetry = async (url, options, maxRetries = 3) => {
     for (let i = 0; i < maxRetries; i++) {
         try {
@@ -108,28 +106,26 @@ const fetchWithRetry = async (url, options, maxRetries = 3) => {
             }
             return response;
         } catch (error) {
-            if (i === maxRetries - 1) throw error; // Re-throw if last attempt
-            const delay = Math.pow(2, i) * 1000; // Exponential backoff (1s, 2s, 4s)
+            if (i === maxRetries - 1) throw error; 
+            const delay = Math.pow(2, i) * 1000; 
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 };
 
-// --- Utility Function to get Firestore Document Reference for Usage ---
+// --- FIRESTORE UTILITIES (FIXED PATHS) ---
+// CRITICAL FIX: Using VITE_FIREBASE_APP_ID instead of 'default-app-id' to ensure persistence works
 const getUsageDocRef = (db, userId) => {
-    // FIX: Use the actual App ID from env to match Firestore Security Rules
-    const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+    const appId = import.meta.env.VITE_FIREBASE_APP_ID || 'fallback-app-id';
     return doc(db, `artifacts/${appId}/users/${userId}/usage_limits`, 'main_tracker');
 };
 
-// --- Utility Function to get Firestore Collection Reference for Reports ---
 const getReportsCollectionRef = (db, userId) => {
-    // FIX: Use the actual App ID from env to match Firestore Security Rules
-    const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+    const appId = import.meta.env.VITE_FIREBASE_APP_ID || 'fallback-app-id';
     return collection(db, `artifacts/${appId}/users/${userId}/compliance_reports`);
 };
 
-// --- Utility function to calculate the standard compliance percentage (Unweighted) ---
+// --- Calculation Utility ---
 const getCompliancePercentage = (report) => {
     const findings = report.findings || []; 
     const totalScore = findings.reduce((sum, item) => sum + (item.complianceScore || 0), 0);
@@ -138,10 +134,8 @@ const getCompliancePercentage = (report) => {
     return maxScore > 0 ? parseFloat(((totalScore / maxScore) * 100).toFixed(1)) : 0;
 };
 
-
-// --- Universal File Processor (handles TXT, PDF, DOCX) ---
+// --- File Processor ---
 const processFile = (file) => {
-    // NOTE: This uses global libraries loaded via script tags in the App component's useEffect
     return new Promise(async (resolve, reject) => {
         const fileExtension = file.name.split('.').pop().toLowerCase();
         const reader = new FileReader();
@@ -191,7 +185,7 @@ const processFile = (file) => {
     });
 };
 
-// --- CORE: Error Boundary Component to prevent white screens ---
+// --- Error Boundary ---
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
@@ -204,10 +198,7 @@ class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, errorInfo) {
         console.error("Uncaught error:", error, errorInfo);
-        this.setState({
-            error: error,
-            errorInfo: errorInfo
-        });
+        this.setState({ error: error, errorInfo: errorInfo });
     }
 
     render() {
@@ -225,12 +216,11 @@ class ErrorBoundary extends React.Component {
                 </div>
             );
         }
-
         return this.props.children; 
     }
 }
 
-// --- Helper Function for File Input Handling ---
+// --- Components ---
 const handleFileChange = (e, setFile, setErrorMessage) => {
     if (e.target.files.length > 0) {
         setFile(e.target.files[0]);
@@ -238,7 +228,6 @@ const handleFileChange = (e, setFile, setErrorMessage) => {
     }
 };
 
-// --- AuthPage Component ---
 const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
     <div>
         <label htmlFor={id || name} className="block text-sm font-medium text-slate-300 mb-1">
@@ -317,11 +306,11 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, isAuthReady, errorMessage, 
                     <h3 className="text-2xl font-bold text-blue-300 flex items-center mb-4"><UserPlus className="w-6 h-6 mr-2" /> Create Account</h3>
                     <form onSubmit={handleRegister} className="space-y-3">
                         <FormInput id="reg-name" label="Full Name *" name="name" value={regForm.name} onChange={handleRegChange} type="text" />
-<FormInput id="reg-designation" label="Designation" name="designation" value={regForm.designation} onChange={handleRegChange} type="text" />
-<FormInput id="reg-company" label="Company" name="company" value={regForm.company} onChange={handleRegChange} type="text" />
-<FormInput id="reg-email" label="Email *" name="email" value={regForm.email} onChange={handleRegChange} type="email" />
-<FormInput id="reg-phone" label="Contact Number" name="phone" value={regForm.phone} onChange={handleRegChange} type="tel" placeholder="Optional" />
-<FormInput id="reg-password" label="Create Password *" name="password" value={regForm.password} onChange={handleRegChange} type="password" />
+                        <FormInput id="reg-designation" label="Designation" name="designation" value={regForm.designation} onChange={handleRegChange} type="text" />
+                        <FormInput id="reg-company" label="Company" name="company" value={regForm.company} onChange={handleRegChange} type="text" />
+                        <FormInput id="reg-email" label="Email *" name="email" value={regForm.email} onChange={handleRegChange} type="email" />
+                        <FormInput id="reg-phone" label="Contact Number" name="phone" value={regForm.phone} onChange={handleRegChange} type="tel" placeholder="Optional" />
+                        <FormInput id="reg-password" label="Create Password *" name="password" value={regForm.password} onChange={handleRegChange} type="password" />
 
                         <button type="submit" disabled={isSubmitting} className={`w-full py-3 text-lg font-semibold rounded-xl text-slate-900 transition-all shadow-lg mt-6 bg-blue-400 hover:bg-blue-300 disabled:opacity-50 flex items-center justify-center`}>
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <UserPlus className="h-5 w-5 mr-2" />}
@@ -334,7 +323,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, isAuthReady, errorMessage, 
                     <h3 className="text-2xl font-bold text-green-300 flex items-center mb-4"><LogIn className="w-6 h-6 mr-2" /> Sign In</h3>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <FormInput id="login-email" label="Email *" name="email" value={loginForm.email} onChange={handleLoginChange} type="email" />
-<FormInput id="login-password" label="Password *" name="password" value={loginForm.password} onChange={handleLoginChange} type="password" />
+                        <FormInput id="login-password" label="Password *" name="password" value={loginForm.password} onChange={handleLoginChange} type="password" />
 
                         <button type="submit" disabled={isSubmitting} className={`w-full py-3 text-lg font-semibold rounded-xl text-slate-900 transition-all shadow-lg mt-6 bg-green-400 hover:bg-green-300 disabled:opacity-50 flex items-center justify-center`}>
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
@@ -356,7 +345,6 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, isAuthReady, errorMessage, 
 
 // --- MAIN APP COMPONENT ---
 const App = () => {
-    // --- State Definitions ---
     const [currentPage, setCurrentPage] = useState(PAGE.HOME);
     const [errorMessage, setErrorMessage] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
@@ -372,18 +360,16 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-// --- EFFECT 1: Auth State Listener ---
+    // --- EFFECT 1: Auth State Listener ---
     useEffect(() => {
         if (!auth) return;
         
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid);
-                
-                // FIX 1: Navigate IMMEDIATELY. Do not wait for database fetch.
-                // This ensures you never get stuck on "Login Successful"
+                // Navigate IMMEDIATELY to prevent login loop
                 setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
-
+                
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
                     if (userDoc.exists()) {
@@ -393,7 +379,6 @@ const App = () => {
                     }
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
-                    // FIX 2: Even if database fails, ensure we have a basic user set
                     setCurrentUser({ uid: user.uid, role: 'USER' });
                 }
             } else {
@@ -414,22 +399,13 @@ const App = () => {
 
             const unsubscribe = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    setUsageLimits({
-                        ...docSnap.data(),
-                        isSubscribed: true 
-                    });
+                    setUsageLimits({ ...docSnap.data(), isSubscribed: true });
                 } else {
-                    const initialData = { 
-                        initiatorChecks: 0, 
-                        bidderChecks: 0, 
-                        isSubscribed: true 
-                    };
+                    const initialData = { initiatorChecks: 0, bidderChecks: 0, isSubscribed: true };
                     setDoc(docRef, initialData).catch(e => console.error("Error creating usage doc:", e));
                     setUsageLimits(initialData);
                 }
-            }, (error) => {
-                console.error("Error listening to usage limits:", error);
-            });
+            }, (error) => console.error("Error listening to usage limits:", error));
 
             return () => unsubscribe();
         }
@@ -440,36 +416,32 @@ const App = () => {
         if (!db || !currentUser) return;
 
         let unsubscribeSnapshot = null;
+        let q;
 
-        if (currentUser.role === 'ADMIN') {
-            // ADMIN — load ALL USERS' reports
-            const collectionGroupRef = collectionGroup(db, 'compliance_reports');
-            const q = query(collectionGroupRef);
+        try {
+            if (currentUser.role === 'ADMIN') {
+                const collectionGroupRef = collectionGroup(db, 'compliance_reports');
+                q = query(collectionGroupRef);
+            } else if (userId) {
+                const reportsRef = getReportsCollectionRef(db, userId);
+                q = query(reportsRef);
+            }
 
-            unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-                const history = [];
-                snapshot.forEach(docSnap => {
-                    history.push({ id: docSnap.id, ...docSnap.data() });
+            if (q) {
+                unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                    const history = [];
+                    snapshot.forEach(docSnap => {
+                        history.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+                    // Sort by timestamp DESC initially
+                    history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    setReportsHistory(history);
+                }, (error) => {
+                    console.error('Error listening to reports:', error);
                 });
-                history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                setReportsHistory(history);
-            }, (error) => {
-                console.error('Error listening to collectionGroup reports:', error);
-            });
-
-        } else if (userId) {
-            // USER — load ONLY their reports
-            const reportsRef = getReportsCollectionRef(db, userId);
-            const q = query(reportsRef);
-
-            unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-                const history = [];
-                snapshot.forEach((doc) => history.push({ id: doc.id, ...doc.data() }));
-                history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                setReportsHistory(history);
-            }, (error) => {
-                console.error('Error listening to user reports:', error);
-            });
+            }
+        } catch (err) {
+            console.error("Error setting up history listener:", err);
         }
 
         return () => unsubscribeSnapshot && unsubscribeSnapshot();
@@ -518,13 +490,9 @@ const App = () => {
         try {
             await runTransaction(db, async (transaction) => {
                 const docSnap = await transaction.get(docRef);
-                let currentData;
-                if (!docSnap.exists()) {
-                    currentData = { initiatorChecks: 0, bidderChecks: 0, isSubscribed: true };
-                    transaction.set(docRef, currentData);
-                } else {
-                    currentData = docSnap.data();
-                }
+                let currentData = docSnap.exists() ? docSnap.data() : { initiatorChecks: 0, bidderChecks: 0, isSubscribed: true };
+                if (!docSnap.exists()) transaction.set(docRef, currentData);
+                
                 const newCount = (currentData[roleKey] || 0) + 1;
                 transaction.update(docRef, { [roleKey]: newCount, isSubscribed: true });
                 setUsageLimits(prev => ({ ...prev, [roleKey]: newCount }));
@@ -672,7 +640,7 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
 
         } catch (error) {
             console.error("Error saving report:", error);
-            setErrorMessage(`Failed to save report: ${error.message}`);
+            setErrorMessage(`Failed to save report: ${error.message}. Check permissions.`);
         } finally {
             setSaving(false);
         }
@@ -719,7 +687,7 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
         setTimeout(() => setErrorMessage(null), 3000);
     }, []);
     
-   // --- Render Switch ---
+    // --- Render Switch ---
     const renderPage = () => {
         switch (currentPage) {
             case PAGE.HOME:
@@ -1336,24 +1304,19 @@ const ComplianceRanking = ({ reportsHistory, loadReportFromHistory, deleteReport
 
     // 2. Function to sort and assign ranks
     const getRankedReports = (reports) => {
+        // Sort by Percentage (High to Low), then Timestamp (New to Old)
         const sortedReports = reports.sort((a, b) => {
             if (b.percentage !== a.percentage) {
                 return b.percentage - a.percentage; 
             }
-            return a.timestamp - b.timestamp; 
+            return b.timestamp - a.timestamp; 
         });
         
-        let currentRank = 1;
-        let lastPercentage = -1;
-        
-        return sortedReports.map((report, index) => {
-            if (report.percentage < lastPercentage) {
-                currentRank = index + 1;
-            }
-            lastPercentage = report.percentage;
-            
-            return { ...report, rank: currentRank };
-        });
+        // Simple ranking based on sort order
+        return sortedReports.map((report, index) => ({
+            ...report,
+            rank: index + 1
+        }));
     };
 
 
@@ -1363,7 +1326,7 @@ const ComplianceRanking = ({ reportsHistory, loadReportFromHistory, deleteReport
                 <Layers className="w-5 h-5 mr-2 text-blue-400"/> Compliance Ranking by RFQ
             </h2>
             <p className="text-sm text-slate-400 mb-6">
-                All saved bids are ranked by compliance score for each specific RFQ.
+                Reports are grouped by Project (RFQ) and ranked by Compliance Score (Highest First).
             </p>
             
             <div className="space-y-6">
@@ -1373,7 +1336,7 @@ const ComplianceRanking = ({ reportsHistory, loadReportFromHistory, deleteReport
                     return (
                         <div key={rfqName} className="p-5 bg-slate-700/50 rounded-xl border border-slate-600 shadow-lg">
                             <h3 className="text-lg font-extrabold text-amber-400 mb-4 border-b border-slate-600 pb-2">
-                                {rfqName} <span className="text-sm font-normal text-slate-400">({data.count} Total Bids Audited)</span>
+                                {rfqName} <span className="text-sm font-normal text-slate-400">({data.count} Revisions)</span>
                             </h3>
                             <div className="space-y-3">
                                 {rankedReports.map((report) => (
@@ -1382,7 +1345,7 @@ const ComplianceRanking = ({ reportsHistory, loadReportFromHistory, deleteReport
                                         className={`p-3 rounded-lg border border-slate-600 bg-slate-900/50 space-y-2 flex justify-between items-center transition hover:bg-slate-700/50`}
                                     >
                                         <div className='flex items-center min-w-0 cursor-pointer' onClick={() => loadReportFromHistory(report)}>
-                                            <div className="text-xl font-extrabold text-amber-500 w-8 flex-shrink-0">
+                                            <div className={`text-xl font-extrabold w-8 flex-shrink-0 ${report.rank === 1 ? 'text-green-400' : 'text-slate-500'}`}>
                                                 #{report.rank}
                                             </div>
                                             <div className='ml-3 min-w-0'>
@@ -1406,7 +1369,7 @@ const ComplianceRanking = ({ reportsHistory, loadReportFromHistory, deleteReport
                                                 </button>
                                             )}
                                             <span className={`px-2 py-0.5 rounded text-sm font-bold bg-blue-600 text-slate-900 block`}>
-                                                Score: {report.percentage}%
+                                                {report.percentage}%
                                             </span>
                                         </div>
                                     </div>
