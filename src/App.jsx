@@ -372,7 +372,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener ---
+// --- EFFECT 1: Auth State Listener ---
     useEffect(() => {
         if (!auth) return;
         
@@ -381,11 +381,13 @@ const App = () => {
                 setUserId(user.uid);
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    // Check if doc exists, otherwise fallback
                     const userData = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : { uid: user.uid, role: 'USER' };
                     
                     setCurrentUser(userData);
                     
-                    // FIX: Use functional state update to safely navigate from HOME without adding 'currentPage' to dependencies
+                    // FIX: Use functional state update to safely navigate from HOME
+                    // This prevents the infinite loop/refresh issues
                     setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
@@ -399,10 +401,7 @@ const App = () => {
         });
 
         return () => unsubscribe();
-    }, []); // FIX: Empty dependency array ensures listener is only attached once
-
-        return () => unsubscribe();
-    }, [currentPage]);
+    }, []); // <--- IMPORTANT: This must be an empty array [], NOT [currentPage]
 
     // --- EFFECT 2: Usage Limits Listener ---
     useEffect(() => {
