@@ -44,7 +44,7 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- UPDATED JSON Schema (Project Title & O&G Support) ---
+// --- JSON Schema ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report with market intelligence data.",
@@ -63,7 +63,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         },
         "industryTag": {
             "type": "STRING",
-            "description": "Classify the project into ONE industry sector. Options: 'Energy / Oil & Gas', 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'. NOTE: If keywords like drilling, offshore, pipeline, or refinery are present, classify as 'Energy / Oil & Gas' instead of Construction."
+            "description": "Classify the project into ONE industry sector based on keywords (e.g., drilling/pipeline -> 'Energy / Oil & Gas', cloud/server -> 'IT/SaaS', cement/steel -> 'Construction')."
         },
         "primaryRisk": {
             "type": "STRING",
@@ -78,7 +78,10 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
             items: {
                 type: "OBJECT",
                 properties: {
-                    "requirementFromRFQ": { "type": "STRING" },
+                    "requirementFromRFQ": { 
+                        "type": "STRING",
+                        "description": "COPY THE EXACT TEXT of the specific mandatory requirement directly from the RFQ document. Do not summarize it." 
+                    },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
                     "flag": { "type": "STRING", "enum": ["COMPLIANT", "PARTIAL", "NON-COMPLIANT"] },
@@ -480,15 +483,17 @@ const App = () => {
             const rfqContent = await processFile(RFQFile);
             const bidContent = await processFile(BidFile);
             
-            // IMPROVED PROMPT: O&G Support + Project Title Extraction
+            // IMPROVED PROMPT: Fixed Industry Logic + Explicit Requirement Copying
             const systemPrompt = {
                 parts: [{
                     text: `You are the SmartBid Compliance Auditor. Your task is to strictly compare the RFQ and the Bid.
                     
                     1. EXTRACT 'projectTitle': Look for the official Project Title on the cover page or header of the RFQ. Do not use the filename.
                     2. EXTRACT 'grandTotalValue': Find the total price/bid amount. If unclear, say 'Unknown'.
-                    3. EXTRACT 'industryTag': INFER the sector. Options: 'Energy / Oil & Gas', 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'. 
-                       *IMPORTANT*: If words like 'offshore', 'drilling', 'pipeline', 'refinery', or 'petroleum' appear, classify as 'Energy / Oil & Gas'.
+                    3. EXTRACT 'industryTag': INFER the sector based on keywords. 
+                       - If words like 'offshore', 'drilling', 'pipeline', 'refinery', 'petroleum', or 'subsea' appear, classify as 'Energy / Oil & Gas'.
+                       - If 'concrete', 'steel', 'building', classify as 'Construction'.
+                       - Else choose: 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'.
                     4. EXTRACT 'primaryRisk': In 5 words or less, what is the biggest deal-breaker risk?
                     5. EXTRACT 'rfqScopeSummary': A 2-3 sentence summary combining the 'Background' and 'Scope of Work' sections of the RFQ.
                     
@@ -497,6 +502,8 @@ const App = () => {
                     8. Score Compliance: 1 (Full), 0.5 (Partial), 0 (Non-Compliant).
                     9. Category: ${CATEGORY_ENUM.join(', ')}.
                     10. Negotiation Stance: Required for scores < 1.
+                    
+                    **CRITICAL STEP**: For each finding, you MUST copy the EXACT text of the requirement from the RFQ into the field 'requirementFromRFQ'. Do not summarize it.
                     
                     11. Generate JSON output ONLY.`
                 }]
@@ -805,6 +812,43 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
     );
 };
 
+// --- DetailItem for consistent user card styling ---
+const DetailItem = ({ icon: Icon, label, value }) => (
+    <div className='flex items-center text-sm text-slate-300'>
+        {Icon && <Icon className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0"/>}
+        <span className="text-slate-500 mr-2 flex-shrink-0">{label}:</span>
+        <span className="font-medium truncate min-w-0" title={value}>{value}</span>
+    </div>
+);
+
+// --- UserCard sub-component for AdminDashboard ---
+const UserCard = ({ user }) => (
+  <div className="p-4 bg-slate-900 rounded-xl border border-slate-700 shadow-md">
+    <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-2">
+      <p className="text-xl font-bold text-white flex items-center">
+        <User className="w-5 h-5 mr-2 text-amber-400" />
+        {user.name}
+      </p>
+      <span
+        className={`text-xs px-3 py-1 rounded-full font-semibold ${
+          user.role === 'ADMIN' ? 'bg-red-500 text-white' : 'bg-green-500 text-slate-900'
+        }`}
+      >
+        {user.role}
+      </span>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4">
+      <DetailItem icon={Briefcase} label="Designation" value={user.designation} />
+      <DetailItem icon={Building} label="Company" value={user.company} />
+      <DetailItem icon={Mail} label="Email" value={user.email} />
+      <DetailItem icon={Phone} label="Contact" value={user.phone || 'N/A'} />
+    </div>
+    <p className="text-xs text-slate-500 mt-3 border-t border-slate-800 pt-2">
+      Login ID: <span className="text-slate-400 font-mono">{user.login}</span>
+    </p>
+  </div>
+);
+
 // --- StatCard sub-component for AdminDashboard ---
 const StatCard = ({ icon, label, value }) => (
   <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 flex items-center space-x-4">
@@ -856,6 +900,34 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // --- Data Logic for Exports ---
+  const handleVendorExport = () => {
+      // Explicitly map ONLY the fields we want for the registry to avoid 'messy' CSVs
+      const cleanVendorData = userList.map(u => ({
+          Name: u.name || '',
+          Company: u.company || '',
+          Designation: u.designation || '',
+          Email: u.email || '',
+          Phone: u.phone || '',
+          Role: u.role || 'USER'
+      }));
+      exportToCSV(cleanVendorData, 'vendor_registry.csv');
+  };
+
+  const handleMarketExport = () => {
+      const cleanMarketData = reportsHistory.map(r => ({
+          ID: r.id,
+          Project: r.projectTitle || r.rfqName,
+          "Scope of Work": r.rfqScopeSummary || 'N/A', // Added Scope as requested
+          Vendor: getUserForReport(r.ownerId),
+          Industry: r.industryTag || 'Unknown',
+          Value: r.grandTotalValue || 'Unknown',
+          "Risk Score": r.primaryRisk || 'N/A',
+          Score: getCompliancePercentage(r) + '%'
+      }));
+      exportToCSV(cleanMarketData, 'market_data.csv');
   };
 
   return (
@@ -935,15 +1007,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                 <Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Data Feed
             </h3>
             <button 
-                onClick={() => exportToCSV(reportsHistory.map(r => ({
-                    id: r.id, 
-                    Project: r.projectTitle || r.rfqName, 
-                    Vendor: getUserForReport(r.ownerId), 
-                    Industry: r.industryTag, 
-                    Value: r.grandTotalValue, 
-                    Risk: r.primaryRisk,
-                    Score: getCompliancePercentage(r)
-                })), 'market_data.csv')}
+                onClick={handleMarketExport}
                 className="text-xs flex items-center bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded no-print"
             >
                 <Download className="w-3 h-3 mr-1"/> Export CSV
@@ -1017,7 +1081,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                 <Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry ({userList.length})
             </h3>
             <button 
-                onClick={() => exportToCSV(userList, 'vendor_registry.csv')}
+                onClick={handleVendorExport}
                 className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded no-print"
             >
                 <Download className="w-3 h-3 mr-1"/> Export CSV
@@ -1329,8 +1393,9 @@ const ComplianceReport = ({ report }) => {
                         </div>
 
                         <p className="font-semibold text-slate-300 mt-2">RFQ Requirement Extracted:</p>
+                        {/* FIX: Added fallback text if extracted requirement is empty */}
                         <p className="p-4 bg-slate-900/80 text-slate-200 rounded-lg border border-slate-700 italic text-sm leading-relaxed">
-                            {item.requirementFromRFQ}
+                            {item.requirementFromRFQ || "Text not extracted by AI"}
                         </p>
 
                         <p className="font-semibold text-slate-300 mt-4">Bidder's Response Summary:</p>
