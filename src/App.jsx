@@ -44,26 +44,26 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- UPDATED JSON Schema (5-Point Market Intel Pack) ---
+// --- JSON Schema ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
-    description: "The complete compliance audit report with deep market intelligence data.",
+    description: "The complete compliance audit report with market intelligence data.",
     properties: {
         "projectTitle": {
             "type": "STRING",
-            "description": "Extract the OFFICIAL PROJECT TITLE from the RFQ cover page or header."
+            "description": "Extract the OFFICIAL PROJECT TITLE from the RFQ cover page or header. Do not use the filename. Example: 'Offshore Pipeline Maintenance Phase 2'."
         },
         "rfqScopeSummary": {
             "type": "STRING",
-            "description": "A high-level summary (2-3 sentences) of the 'Background' and 'Scope of Work' from the RFQ."
+            "description": "A high-level summary (2-3 sentences) combining the 'Project Background' and 'Scope of Work' from the RFQ."
         },
         "grandTotalValue": {
             "type": "STRING",
-            "description": "Extract the total proposed Bid Price/Cost (e.g., '$450,000' or 'Unknown')."
+            "description": "Extract the total proposed Bid Price/Cost from the Bid Document (e.g., '$450,000' or 'Not Disclosed'). If unclear, estimate or state 'Unknown'."
         },
         "industryTag": {
             "type": "STRING",
-            "description": "Classify the project into ONE sector: 'Energy / Oil & Gas', 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'."
+            "description": "Classify the project into ONE industry sector based on keywords (e.g., drilling/pipeline -> 'Energy / Oil & Gas', cloud/server -> 'IT/SaaS', cement/steel -> 'Construction')."
         },
         "primaryRisk": {
             "type": "STRING",
@@ -104,7 +104,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
                 properties: {
                     "requirementFromRFQ": { 
                         "type": "STRING",
-                        "description": "COPY THE EXACT TEXT of the specific mandatory requirement directly from the RFQ document." 
+                        "description": "COPY THE EXACT TEXT of the specific mandatory requirement directly from the RFQ document. Do not summarize it." 
                     },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
@@ -952,11 +952,17 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
       const cleanMarketData = reportsHistory.map(r => ({
           ID: r.id,
           Project: r.projectTitle || r.rfqName,
-          "Scope of Work": r.rfqScopeSummary || 'N/A', // Added Scope as requested
+          "Scope of Work": r.rfqScopeSummary || 'N/A',
           Vendor: getUserForReport(r.ownerId),
           Industry: r.industryTag || 'Unknown',
           Value: r.grandTotalValue || 'Unknown',
-          "Risk Score": r.primaryRisk || 'N/A',
+          // --- NEW FIELDS ADDED TO CSV ---
+          Location: r.projectLocation || 'N/A',
+          Duration: r.contractDuration || 'N/A',
+          "Tech Stack": r.techKeywords || 'N/A',
+          Incumbent: r.incumbentSystem || 'N/A',
+          Regulations: r.requiredCertifications || 'N/A',
+          "Risk Identified": r.primaryRisk || 'N/A', // Renamed
           Score: getCompliancePercentage(r) + '%'
       }));
       exportToCSV(cleanMarketData, 'market_data.csv');
