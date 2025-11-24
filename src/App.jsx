@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { 
     FileUp, Send, Loader2, AlertTriangle, CheckCircle, List, FileText, BarChart2,
     Save, Clock, Zap, ArrowLeft, Users, Briefcase, Layers, UserPlus, LogIn, Tag,
-    Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity
+    Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity, Printer, Download
 } from 'lucide-react'; 
 
 // --- FIREBASE IMPORTS ---
@@ -44,7 +44,7 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- UPDATED JSON Schema (Capture Market Intel) ---
+// --- UPDATED JSON Schema (Smarter Industry Logic) ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report with market intelligence data.",
@@ -59,11 +59,11 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         },
         "industryTag": {
             "type": "STRING",
-            "description": "Classify the project into ONE industry sector: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', or 'Other'."
+            "description": "INFER the industry sector based on context keywords (e.g., 'concrete/steel' -> 'Construction', 'cloud/server' -> 'IT/SaaS', 'audit/tax' -> 'Financial'). MUST choose one: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'."
         },
         "primaryRisk": {
             "type": "STRING",
-            "description": "In 5 words or less, state the biggest compliance risk (e.g., 'Missing Financials', 'Liability Cap Mismatch')."
+            "description": "In 5 words or less, state the biggest deal-breaker risk found in the bid."
         },
         "executiveSummary": {
             "type": "STRING",
@@ -476,12 +476,13 @@ const App = () => {
             const rfqContent = await processFile(RFQFile);
             const bidContent = await processFile(BidFile);
             
+            // IMPROVED PROMPT: Forces Industry Inference
             const systemPrompt = {
                 parts: [{
                     text: `You are the SmartBid Compliance Auditor. Your task is to strictly compare the RFQ and the Bid.
                     
                     1. EXTRACT 'grandTotalValue': Find the total price/bid amount. If unclear, say 'Unknown'.
-                    2. EXTRACT 'industryTag': Classify RFQ into ONE sector: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', or 'Other'.
+                    2. EXTRACT 'industryTag': INFER the industry sector based on context keywords (e.g., 'concrete/steel' -> 'Construction', 'cloud/server' -> 'IT/SaaS', 'audit/tax' -> 'Financial'). MUST choose one: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'.
                     3. EXTRACT 'primaryRisk': In 5 words or less, what is the biggest deal-breaker risk?
                     4. EXTRACT 'rfqScopeSummary': A 1-2 sentence high-level summary of the job description from the RFQ.
                     
@@ -695,6 +696,8 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     setCurrentPage={setCurrentPage}
                     currentUser={currentUser}
                     reportsHistory={reportsHistory}
+                    // FIX: Pass down the loader so Admin can click on reports
+                    loadReportFromHistory={loadReportFromHistory}
                     />;
             case PAGE.HISTORY:
                 return <ReportHistory 
@@ -759,6 +762,33 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                 .custom-scrollbar::-webkit-scrollbar-track {
                     background-color: #1e293b;
                 }
+
+                /* PRINT STYLES */
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    #admin-print-area, #admin-print-area * {
+                        visibility: visible;
+                    }
+                    #admin-print-area {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        background-color: white;
+                        color: black;
+                        padding: 20px;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                    /* Force background colors to print */
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                }
             `}</style>
             
             <div className="max-w-4xl mx-auto space-y-10">
@@ -817,7 +847,7 @@ const StatCard = ({ icon, label, value }) => (
 );
 
 // --- AdminDashboard component (MARKET INTEL ENABLED) ---
-const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
+const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadReportFromHistory }) => {
   const [userList, setUserList] = useState([]);
 
   useEffect(() => {
@@ -835,7 +865,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
 
   // Calculate Global Stats
   const totalAudits = reportsHistory.length; 
-  const recentReports = reportsHistory.slice(0, 10); // Show 10 most recent
+  const recentReports = reportsHistory.slice(0, 15); // Show 15 most recent
 
   // Helper to find user info for a report
   const getUserForReport = (ownerId) => {
@@ -843,30 +873,53 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
     return found ? `${found.name} (${found.company})` : `User ID: ${ownerId}`;
   };
 
+  // Helper: Export Data to CSV
+  const exportToCSV = (data, filename) => {
+    if (!data || !data.length) return;
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + Object.keys(data[0]).join(",") + "\n" 
+        + data.map(e => Object.values(e).map(v => `"${v}"`).join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl shadow-black/50 border border-slate-700 space-y-8">
+    <div id="admin-print-area" className="bg-slate-800 p-8 rounded-2xl shadow-2xl shadow-black/50 border border-slate-700 space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-700 pb-4">
         <h2 className="text-3xl font-bold text-white flex items-center">
           <Shield className="w-8 h-8 mr-3 text-red-400" />
           Admin Market Intelligence
         </h2>
-        <button
-          onClick={() => setCurrentPage('HOME')}
-          className="text-sm text-slate-400 hover:text-amber-500 flex items-center"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" /> Logout
-        </button>
+        <div className="flex space-x-3 no-print">
+            <button
+                onClick={() => window.print()}
+                className="text-sm text-slate-400 hover:text-white flex items-center bg-slate-700 px-3 py-2 rounded-lg"
+            >
+                <Printer className="w-4 h-4 mr-2" /> Print Dashboard
+            </button>
+            <button
+            onClick={() => setCurrentPage('HOME')}
+            className="text-sm text-slate-400 hover:text-amber-500 flex items-center"
+            >
+            <ArrowLeft className="w-4 h-4 mr-1" /> Logout
+            </button>
+        </div>
       </div>
 
-      {/* Welcome */}
-      <p className="text-lg text-slate-300">
+      {/* Welcome (Hidden on Print) */}
+      <p className="text-lg text-slate-300 no-print">
         Welcome, <span className="font-bold text-red-400">{currentUser?.name || 'Admin'}</span>.
         Collecting real-time market data from <span className="text-white font-bold">{userList.length}</span> active vendors.
       </p>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Quick Actions (Hidden on Print) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
         <button
           onClick={() => setCurrentPage('COMPLIANCE_CHECK')}
           className="p-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold flex items-center justify-center text-lg transition-all shadow-lg"
@@ -907,9 +960,26 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
 
       {/* Live Market Feed (ENHANCED GOD VIEW) */}
       <div className="pt-4 border-t border-slate-700">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-            <Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Data Feed
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-white flex items-center">
+                <Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Data Feed
+            </h3>
+            <button 
+                onClick={() => exportToCSV(reportsHistory.map(r => ({
+                    id: r.id, 
+                    Project: r.rfqName, 
+                    Vendor: getUserForReport(r.ownerId), 
+                    Industry: r.industryTag, 
+                    Value: r.grandTotalValue, 
+                    Risk: r.primaryRisk,
+                    Score: getCompliancePercentage(r)
+                })), 'market_data.csv')}
+                className="text-xs flex items-center bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded no-print"
+            >
+                <Download className="w-3 h-3 mr-1"/> Export CSV
+            </button>
+        </div>
+        
         <div className="space-y-4">
           {recentReports.length > 0 ? (
             recentReports.map(item => {
@@ -917,7 +987,11 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
                 const scoreColor = percentage >= 80 ? 'text-green-400' : percentage >= 50 ? 'text-amber-400' : 'text-red-400';
                 
                 return (
-                  <div key={item.id} className="p-4 bg-slate-900/50 rounded-xl border border-slate-700 shadow-sm hover:bg-slate-900 transition">
+                  <div 
+                    key={item.id} 
+                    onClick={() => loadReportFromHistory(item)}
+                    className="p-4 bg-slate-900/50 rounded-xl border border-slate-700 shadow-sm hover:bg-slate-900 transition cursor-pointer group"
+                  >
                     {/* Row 1: Project & Vendor */}
                     <div className="flex flex-col sm:flex-row justify-between items-start mb-3">
                         <div>
@@ -925,7 +999,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
                                 <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-900 text-blue-200 border border-blue-700">
                                     {item.industryTag || 'UNCLASSIFIED'}
                                 </span>
-                                <h4 className="text-lg font-bold text-white">{item.rfqName}</h4>
+                                <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{item.rfqName}</h4>
                             </div>
                             <p className="text-sm text-slate-400 mt-1 flex items-center">
                                 <User className="w-3 h-3 mr-1"/> Vendor: {getUserForReport(item.ownerId)}
@@ -967,9 +1041,17 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
       
       {/* Registered Users */}
       <div className="pt-4 border-t border-slate-700">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-          <Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry ({userList.length})
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-white flex items-center">
+                <Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry ({userList.length})
+            </h3>
+            <button 
+                onClick={() => exportToCSV(userList, 'vendor_registry.csv')}
+                className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded no-print"
+            >
+                <Download className="w-3 h-3 mr-1"/> Export CSV
+            </button>
+        </div>
         <div className="max-h-64 overflow-y-auto pr-3 space-y-4 custom-scrollbar bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
           {userList.map((user, index) => (
             <UserCard key={index} user={user} />
