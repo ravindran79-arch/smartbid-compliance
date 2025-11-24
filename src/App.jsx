@@ -44,14 +44,18 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- UPDATED JSON Schema (Smarter Industry Logic) ---
+// --- UPDATED JSON Schema (Project Title & O&G Support) ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report with market intelligence data.",
     properties: {
+        "projectTitle": {
+            "type": "STRING",
+            "description": "Extract the OFFICIAL PROJECT TITLE from the RFQ cover page or header. Do not use the filename. Example: 'Offshore Pipeline Maintenance Phase 2'."
+        },
         "rfqScopeSummary": {
             "type": "STRING",
-            "description": "A 1-2 sentence high-level summary of the project scope strictly from the RFQ. What is the job?"
+            "description": "A high-level summary (2-3 sentences) combining the 'Project Background' and 'Scope of Work' from the RFQ."
         },
         "grandTotalValue": {
             "type": "STRING",
@@ -59,7 +63,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         },
         "industryTag": {
             "type": "STRING",
-            "description": "INFER the industry sector based on context keywords (e.g., 'concrete/steel' -> 'Construction', 'cloud/server' -> 'IT/SaaS', 'audit/tax' -> 'Financial'). MUST choose one: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'."
+            "description": "Classify the project into ONE industry sector. Options: 'Energy / Oil & Gas', 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'. NOTE: If keywords like drilling, offshore, pipeline, or refinery are present, classify as 'Energy / Oil & Gas' instead of Construction."
         },
         "primaryRisk": {
             "type": "STRING",
@@ -84,7 +88,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
             }
         }
     },
-    "required": ["rfqScopeSummary", "grandTotalValue", "industryTag", "primaryRisk", "executiveSummary", "findings"]
+    "required": ["projectTitle", "rfqScopeSummary", "grandTotalValue", "industryTag", "primaryRisk", "executiveSummary", "findings"]
 };
 
 // --- API Utility ---
@@ -476,23 +480,25 @@ const App = () => {
             const rfqContent = await processFile(RFQFile);
             const bidContent = await processFile(BidFile);
             
-            // IMPROVED PROMPT: Forces Industry Inference
+            // IMPROVED PROMPT: O&G Support + Project Title Extraction
             const systemPrompt = {
                 parts: [{
                     text: `You are the SmartBid Compliance Auditor. Your task is to strictly compare the RFQ and the Bid.
                     
-                    1. EXTRACT 'grandTotalValue': Find the total price/bid amount. If unclear, say 'Unknown'.
-                    2. EXTRACT 'industryTag': INFER the industry sector based on context keywords (e.g., 'concrete/steel' -> 'Construction', 'cloud/server' -> 'IT/SaaS', 'audit/tax' -> 'Financial'). MUST choose one: 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'.
-                    3. EXTRACT 'primaryRisk': In 5 words or less, what is the biggest deal-breaker risk?
-                    4. EXTRACT 'rfqScopeSummary': A 1-2 sentence high-level summary of the job description from the RFQ.
+                    1. EXTRACT 'projectTitle': Look for the official Project Title on the cover page or header of the RFQ. Do not use the filename.
+                    2. EXTRACT 'grandTotalValue': Find the total price/bid amount. If unclear, say 'Unknown'.
+                    3. EXTRACT 'industryTag': INFER the sector. Options: 'Energy / Oil & Gas', 'Construction', 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'. 
+                       *IMPORTANT*: If words like 'offshore', 'drilling', 'pipeline', 'refinery', or 'petroleum' appear, classify as 'Energy / Oil & Gas'.
+                    4. EXTRACT 'primaryRisk': In 5 words or less, what is the biggest deal-breaker risk?
+                    5. EXTRACT 'rfqScopeSummary': A 2-3 sentence summary combining the 'Background' and 'Scope of Work' sections of the RFQ.
                     
-                    5. Identify mandatory requirements from RFQ.
-                    6. Locate corresponding response in Bid.
-                    7. Score Compliance: 1 (Full), 0.5 (Partial), 0 (Non-Compliant).
-                    8. Category: ${CATEGORY_ENUM.join(', ')}.
-                    9. Negotiation Stance: Required for scores < 1.
+                    6. Identify mandatory requirements from RFQ.
+                    7. Locate corresponding response in Bid.
+                    8. Score Compliance: 1 (Full), 0.5 (Partial), 0 (Non-Compliant).
+                    9. Category: ${CATEGORY_ENUM.join(', ')}.
+                    10. Negotiation Stance: Required for scores < 1.
                     
-                    10. Generate JSON output ONLY.`
+                    11. Generate JSON output ONLY.`
                 }]
             };
 
@@ -537,6 +543,9 @@ const App = () => {
     // --- CORE LOGIC: Test Data ---
     const generateTestData = useCallback(async () => {
         const mockRfqContent = `
+PROJECT TITLE: OFFSHORE PIPELINE MAINTENANCE PHASE 3
+BACKGROUND: This project involves the inspection and repair of subsea pipelines in the North Sea.
+SCOPE OF WORK: Contractor shall provide a diving support vessel and ROV team for 60 days.
 1. TECHNICAL: The proposed cloud solution must integrate bi-directionally with our legacy billing system via its existing REST/JSON API endpoints, as detailed in Appendix B. This is a mandatory core technical specification.
 2. FINANCIAL: Bidders must submit a Firm Fixed Price (FFP) quote for all services covering the first 12 calendar months of operation. Cost estimates or time-and-materials pricing will result in non-compliance.
 3. LEGAL: A signed, legally binding Non-Disclosure Agreement (NDA) must be included as a separate document, titled "Appendix A," within the submission package.
@@ -696,7 +705,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     setCurrentPage={setCurrentPage}
                     currentUser={currentUser}
                     reportsHistory={reportsHistory}
-                    // FIX: Pass down the loader so Admin can click on reports
                     loadReportFromHistory={loadReportFromHistory}
                     />;
             case PAGE.HISTORY:
@@ -783,7 +791,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
                     .no-print {
                         display: none !important;
                     }
-                    /* Force background colors to print */
                     * {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
@@ -797,43 +804,6 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
         </div>
     );
 };
-
-// --- DetailItem for consistent user card styling ---
-const DetailItem = ({ icon: Icon, label, value }) => (
-    <div className='flex items-center text-sm text-slate-300'>
-        {Icon && <Icon className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0"/>}
-        <span className="text-slate-500 mr-2 flex-shrink-0">{label}:</span>
-        <span className="font-medium truncate min-w-0" title={value}>{value}</span>
-    </div>
-);
-
-// --- UserCard sub-component for AdminDashboard ---
-const UserCard = ({ user }) => (
-  <div className="p-4 bg-slate-900 rounded-xl border border-slate-700 shadow-md">
-    <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-2">
-      <p className="text-xl font-bold text-white flex items-center">
-        <User className="w-5 h-5 mr-2 text-amber-400" />
-        {user.name}
-      </p>
-      <span
-        className={`text-xs px-3 py-1 rounded-full font-semibold ${
-          user.role === 'ADMIN' ? 'bg-red-500 text-white' : 'bg-green-500 text-slate-900'
-        }`}
-      >
-        {user.role}
-      </span>
-    </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4">
-      <DetailItem icon={Briefcase} label="Designation" value={user.designation} />
-      <DetailItem icon={Building} label="Company" value={user.company} />
-      <DetailItem icon={Mail} label="Email" value={user.email} />
-      <DetailItem icon={Phone} label="Contact" value={user.phone || 'N/A'} />
-    </div>
-    <p className="text-xs text-slate-500 mt-3 border-t border-slate-800 pt-2">
-      Login ID: <span className="text-slate-400 font-mono">{user.login}</span>
-    </p>
-  </div>
-);
 
 // --- StatCard sub-component for AdminDashboard ---
 const StatCard = ({ icon, label, value }) => (
@@ -901,7 +871,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                 onClick={() => window.print()}
                 className="text-sm text-slate-400 hover:text-white flex items-center bg-slate-700 px-3 py-2 rounded-lg"
             >
-                <Printer className="w-4 h-4 mr-2" /> Print Dashboard
+                <Printer className="w-4 h-4 mr-2" /> Print
             </button>
             <button
             onClick={() => setCurrentPage('HOME')}
@@ -967,7 +937,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
             <button 
                 onClick={() => exportToCSV(reportsHistory.map(r => ({
                     id: r.id, 
-                    Project: r.rfqName, 
+                    Project: r.projectTitle || r.rfqName, 
                     Vendor: getUserForReport(r.ownerId), 
                     Industry: r.industryTag, 
                     Value: r.grandTotalValue, 
@@ -985,6 +955,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
             recentReports.map(item => {
                 const percentage = getCompliancePercentage(item);
                 const scoreColor = percentage >= 80 ? 'text-green-400' : percentage >= 50 ? 'text-amber-400' : 'text-red-400';
+                const projectTitleDisplay = item.projectTitle || item.rfqName; // Fallback to filename
                 
                 return (
                   <div 
@@ -999,7 +970,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                                 <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-900 text-blue-200 border border-blue-700">
                                     {item.industryTag || 'UNCLASSIFIED'}
                                 </span>
-                                <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{item.rfqName}</h4>
+                                <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{projectTitleDisplay}</h4>
                             </div>
                             <p className="text-sm text-slate-400 mt-1 flex items-center">
                                 <User className="w-3 h-3 mr-1"/> Vendor: {getUserForReport(item.ownerId)}
@@ -1039,7 +1010,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
         </div>
       </div>
       
-      {/* Registered Users */}
+      {/* Registered Users (FIXED: Table Layout) */}
       <div className="pt-4 border-t border-slate-700">
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-white flex items-center">
@@ -1052,10 +1023,37 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                 <Download className="w-3 h-3 mr-1"/> Export CSV
             </button>
         </div>
-        <div className="max-h-64 overflow-y-auto pr-3 space-y-4 custom-scrollbar bg-slate-900/30 p-4 rounded-xl border border-slate-700/50">
-          {userList.map((user, index) => (
-            <UserCard key={index} user={user} />
-          ))}
+        
+        {/* New Table Structure for Registry */}
+        <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900">
+            <table className="w-full text-left text-sm text-slate-400">
+                <thead className="bg-slate-800 text-slate-200 uppercase font-bold sticky top-0">
+                    <tr>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Company</th>
+                        <th className="px-4 py-3">Designation</th>
+                        <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3 text-right">Role</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                    {userList.map((user, index) => (
+                        <tr key={index} className="hover:bg-slate-800/50 transition">
+                            <td className="px-4 py-3 font-medium text-white">{user.name}</td>
+                            <td className="px-4 py-3">{user.company}</td>
+                            <td className="px-4 py-3">{user.designation}</td>
+                            <td className="px-4 py-3">{user.email}</td>
+                            <td className="px-4 py-3">{user.phone || 'N/A'}</td>
+                            <td className="px-4 py-3 text-right">
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${user.role === 'ADMIN' ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
+                                    {user.role}
+                                </span>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
       </div>
     </div>
