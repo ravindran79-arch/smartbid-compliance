@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { 
     FileUp, Send, Loader2, AlertTriangle, CheckCircle, List, FileText, BarChart2,
     Save, Clock, Zap, ArrowLeft, Users, Briefcase, Layers, UserPlus, LogIn, Tag,
-    Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity, Printer, Download, MapPin, Calendar
+    Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity, 
+    Printer, Download, MapPin, Calendar, ThumbsUp, ThumbsDown, Gavel, Paperclip, Copy, Award
 } from 'lucide-react'; 
 
 // --- FIREBASE IMPORTS ---
@@ -44,68 +45,67 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- JSON Schema ---
+// --- UPDATED JSON Schema (5-Point SaaS Coach Pack) ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
-    description: "The complete compliance audit report with market intelligence data.",
+    description: "The complete compliance audit report with market intelligence and bid coaching data.",
     properties: {
-        "projectTitle": {
-            "type": "STRING",
-            "description": "Extract the OFFICIAL PROJECT TITLE from the RFQ cover page or header. Do not use the filename. Example: 'Offshore Pipeline Maintenance Phase 2'."
-        },
-        "rfqScopeSummary": {
-            "type": "STRING",
-            "description": "A high-level summary (2-3 sentences) combining the 'Project Background' and 'Scope of Work' from the RFQ."
-        },
-        "grandTotalValue": {
-            "type": "STRING",
-            "description": "Extract the total proposed Bid Price/Cost from the Bid Document (e.g., '$450,000' or 'Not Disclosed'). If unclear, estimate or state 'Unknown'."
-        },
-        "industryTag": {
-            "type": "STRING",
-            "description": "Classify the project into ONE industry sector based on keywords (e.g., drilling/pipeline -> 'Energy / Oil & Gas', cloud/server -> 'IT/SaaS', cement/steel -> 'Construction')."
-        },
-        "primaryRisk": {
-            "type": "STRING",
-            "description": "In 5 words or less, state the biggest deal-breaker risk found in the bid."
-        },
-        
-        // --- NEW MARKET INTEL FIELDS ---
-        "projectLocation": {
-            "type": "STRING",
-            "description": "Extract the geographic location of the project (e.g., 'Austin, TX', 'North Sea', 'Remote')."
-        },
-        "contractDuration": {
-            "type": "STRING",
-            "description": "Extract the proposed timeline or contract length (e.g., '3 Years', '60 Days', '12 Months')."
-        },
-        "techKeywords": {
-            "type": "STRING",
-            "description": "List the top 3 critical technologies, materials, or skills required (e.g., 'Python, AWS, React' or 'Steel, Concrete, HVAC')."
-        },
-        "incumbentSystem": {
-            "type": "STRING",
-            "description": "Identify if there is a legacy system or vendor being replaced (e.g., 'Replacing SAP', 'None mentioned')."
-        },
-        "requiredCertifications": {
-            "type": "STRING",
-            "description": "List key mandatory certifications (e.g., 'ISO 9001, HIPAA, FedRAMP' or 'None')."
-        },
-        // -------------------------------
+        // --- ADMIN / MARKET INTEL FIELDS ---
+        "projectTitle": { "type": "STRING", "description": "Official Project Title from RFQ." },
+        "rfqScopeSummary": { "type": "STRING", "description": "High-level scope summary from RFQ." },
+        "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
+        "industryTag": { "type": "STRING", "description": "Industry Sector." },
+        "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
+        "projectLocation": { "type": "STRING", "description": "Geographic location." },
+        "contractDuration": { "type": "STRING", "description": "Proposed timeline." },
+        "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
+        "incumbentSystem": { "type": "STRING", "description": "Legacy system being replaced." },
+        "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
 
-        "executiveSummary": {
+        // --- NEW USER COACHING FIELDS ---
+        "generatedExecutiveSummary": {
             "type": "STRING",
-            "description": "A concise, high-level summary of the compliance audit findings."
+            "description": "Write a perfect, 1-paragraph Executive Summary (approx 100 words) that bridges the RFQ requirements with the Bidder's solution. The user will copy/paste this."
         },
+        "persuasionScore": {
+            "type": "NUMBER",
+            "description": "Score from 0-100 based on confidence, active voice, and clarity of the Bid."
+        },
+        "toneAnalysis": {
+            "type": "STRING",
+            "description": "One word describing the bid tone (e.g., 'Confident', 'Passive', 'Vague', 'Aggressive')."
+        },
+        "weakWords": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List up to 3 weak words found (e.g., 'hope', 'believe', 'try')."
+        },
+        "procurementVerdict": {
+            "type": "OBJECT",
+            "properties": {
+                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 reasons a buyer would say YES." },
+                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 reasons a buyer would say NO." }
+            }
+        },
+        "legalRiskAlerts": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List dangerous legal clauses accepted without pushback (e.g., 'Unlimited Liability', 'IP Ownership'). If none, return empty."
+        },
+        "submissionChecklist": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List of physical artifacts/attachments required by the RFQ (e.g., 'Tax Clearance', 'Appendix A', 'Gantt Chart')."
+        },
+
+        // --- CORE COMPLIANCE FIELDS ---
+        "executiveSummary": { "type": "STRING", "description": "Audit summary." },
         "findings": {
             type: "ARRAY",
             items: {
                 type: "OBJECT",
                 properties: {
-                    "requirementFromRFQ": { 
-                        "type": "STRING",
-                        "description": "COPY THE EXACT TEXT of the specific mandatory requirement directly from the RFQ document. Do not summarize it." 
-                    },
+                    "requirementFromRFQ": { "type": "STRING", "description": "EXACT TEXT of requirement." },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
                     "flag": { "type": "STRING", "enum": ["COMPLIANT", "PARTIAL", "NON-COMPLIANT"] },
@@ -115,7 +115,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
             }
         }
     },
-    "required": ["projectTitle", "rfqScopeSummary", "grandTotalValue", "industryTag", "primaryRisk", "projectLocation", "contractDuration", "techKeywords", "incumbentSystem", "requiredCertifications", "executiveSummary", "findings"]
+    "required": ["projectTitle", "rfqScopeSummary", "grandTotalValue", "industryTag", "primaryRisk", "generatedExecutiveSummary", "persuasionScore", "toneAnalysis", "procurementVerdict", "legalRiskAlerts", "submissionChecklist", "executiveSummary", "findings"]
 };
 
 // --- API Utility ---
@@ -507,41 +507,39 @@ const App = () => {
             const rfqContent = await processFile(RFQFile);
             const bidContent = await processFile(BidFile);
             
-            // IMPROVED PROMPT: Market Intel + Explicit Requirement Copying
+            // IMPROVED PROMPT: Full SaaS Coach Instructions
             const systemPrompt = {
                 parts: [{
-                    text: `You are the SmartBid Compliance Auditor. Your task is to strictly compare the RFQ and the Bid.
+                    text: `You are the SmartBid Compliance Auditor & Coach.
                     
-                    1. EXTRACT 'projectTitle': Look for the official Project Title on the cover page or header of the RFQ. Do not use the filename.
-                    2. EXTRACT 'grandTotalValue': Find the total price/bid amount. If unclear, say 'Unknown'.
-                    3. EXTRACT 'industryTag': INFER the sector based on keywords. 
-                       - If words like 'offshore', 'drilling', 'pipeline', 'refinery', 'petroleum', or 'subsea' appear, classify as 'Energy / Oil & Gas'.
-                       - If 'concrete', 'steel', 'building', classify as 'Construction'.
-                       - Else choose: 'IT/SaaS', 'Healthcare', 'Logistics', 'Consulting', 'Manufacturing', 'Financial', or 'Other'.
-                    4. EXTRACT 'primaryRisk': In 5 words or less, what is the biggest deal-breaker risk?
-                    5. EXTRACT 'rfqScopeSummary': A 2-3 sentence summary combining the 'Background' and 'Scope of Work' sections of the RFQ.
-                    
-                    // --- NEW MARKET FIELDS ---
-                    6. EXTRACT 'projectLocation': (e.g., 'Austin, TX').
-                    7. EXTRACT 'contractDuration': (e.g., '3 Years').
-                    8. EXTRACT 'techKeywords': (e.g., 'Python, AWS' or 'Steel, HVAC').
-                    9. EXTRACT 'incumbentSystem': (e.g., 'Replacing SAP' or 'None').
-                    10. EXTRACT 'requiredCertifications': (e.g., 'ISO 9001' or 'None').
-                    // -------------------------
+                    **TASK 1: Market Intel Extraction**
+                    1. EXTRACT 'projectTitle': Official Title from RFQ.
+                    2. EXTRACT 'grandTotalValue': Total Bid Price.
+                    3. EXTRACT 'industryTag': Keyword-based sector (Energy, Construction, IT, etc.).
+                    4. EXTRACT 'primaryRisk': Biggest deal-breaker risk.
+                    5. EXTRACT 'rfqScopeSummary': 2-3 sentence scope summary.
+                    6. EXTRACT 'projectLocation', 'contractDuration', 'techKeywords', 'incumbentSystem', 'requiredCertifications'.
 
-                    11. Identify mandatory requirements from RFQ.
-                    12. Locate corresponding response in Bid.
-                    13. Score Compliance: 1 (Full), 0.5 (Partial), 0 (Non-Compliant).
-                    14. Category: ${CATEGORY_ENUM.join(', ')}.
-                    15. Negotiation Stance: Required for scores < 1.
+                    **TASK 2: Bid Coaching**
+                    1. GENERATE 'generatedExecutiveSummary': A perfect 1-paragraph executive summary bridging RFQ needs with Bidder solution.
+                    2. CALCULATE 'persuasionScore': 0-100 score based on confidence and active voice.
+                    3. ANALYZE 'toneAnalysis': One word (e.g., Confident, Passive).
+                    4. FIND 'weakWords': List up to 3 weak words used (e.g., hope, try).
+                    5. JUDGE 'procurementVerdict': List 3 'winningFactors' (Why Yes) and 3 'losingFactors' (Why No).
+                    6. ALERT 'legalRiskAlerts': List dangerous clauses accepted (Indemnity, Liability).
+                    7. CHECK 'submissionChecklist': List required artifacts (Appendix, Tax Cert).
+
+                    **TASK 3: Compliance Audit**
+                    1. Identify mandatory requirements.
+                    2. Locate response.
+                    3. Score (1/0.5/0).
+                    4. CRITICAL: Copy EXACT text to 'requirementFromRFQ'.
                     
-                    **CRITICAL STEP**: For each finding, you MUST copy the EXACT text of the requirement from the RFQ into the field 'requirementFromRFQ'. Do not summarize it.
-                    
-                    16. Generate JSON output ONLY.`
+                    Output strictly as JSON.`
                 }]
             };
 
-            const userQuery = `RFQ Document (Doc A):\n${rfqContent}\n\nBid Document (Doc B):\n${bidContent}\n\nPerform compliance audit.`;
+            const userQuery = `RFQ Document (Doc A):\n${rfqContent}\n\nBid Document (Doc B):\n${bidContent}\n\nPerform compliance audit & coaching.`;
             
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
@@ -585,6 +583,7 @@ const App = () => {
 PROJECT TITLE: OFFSHORE PIPELINE MAINTENANCE PHASE 3
 BACKGROUND: This project involves the inspection and repair of subsea pipelines in the North Sea.
 SCOPE OF WORK: Contractor shall provide a diving support vessel and ROV team for 60 days.
+ATTACHMENTS: Please attach Appendix A (Safety Record) and Tax Clearance Certificate.
 1. TECHNICAL: The proposed cloud solution must integrate bi-directionally with our legacy billing system via its existing REST/JSON API endpoints, as detailed in Appendix B. This is a mandatory core technical specification.
 2. FINANCIAL: Bidders must submit a Firm Fixed Price (FFP) quote for all services covering the first 12 calendar months of operation. Cost estimates or time-and-materials pricing will result in non-compliance.
 3. LEGAL: A signed, legally binding Non-Disclosure Agreement (NDA) must be included as a separate document, titled "Appendix A," within the submission package.
@@ -594,7 +593,7 @@ SCOPE OF WORK: Contractor shall provide a diving support vessel and ROV team for
         
         const mockBidContent = `
 --- EXECUTIVE SUMMARY ---
-We are pleased to submit our proposal for the Cloud Migration Service. We are committed to a successful partnership.
+We hope to submit our proposal for the Cloud Migration Service. We believe we are a good partner.
 
 --- TECHNICAL RESPONSE ---
 1. Technical Integration: We propose using our cutting-edge GraphQL gateway for integration, as it offers superior flexibility. While we prefer GraphQL, we understand the requirement for REST/JSON integration with the legacy billing system. We can certainly look into developing the necessary REST/JSON adaptors during the implementation phase, contingent upon a change order if complexity is higher than anticipated.
@@ -694,8 +693,16 @@ We are pleased to submit our proposal for the Cloud Migration Service. We are co
         setBidFile(null);
         setReport({
             id: historyItem.id, 
+            // Load all new fields
             executiveSummary: historyItem.executiveSummary,
             findings: historyItem.findings,
+            generatedExecutiveSummary: historyItem.generatedExecutiveSummary,
+            persuasionScore: historyItem.persuasionScore,
+            toneAnalysis: historyItem.toneAnalysis,
+            weakWords: historyItem.weakWords,
+            procurementVerdict: historyItem.procurementVerdict,
+            legalRiskAlerts: historyItem.legalRiskAlerts,
+            submissionChecklist: historyItem.submissionChecklist
         });
         setCurrentPage(PAGE.COMPLIANCE_CHECK); 
         setErrorMessage(`Loaded report: ${historyItem.rfqName} vs ${historyItem.bidName}`);
@@ -962,7 +969,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
           "Tech Stack": r.techKeywords || 'N/A',
           Incumbent: r.incumbentSystem || 'N/A',
           Regulations: r.requiredCertifications || 'N/A',
-          "Risk Identified": r.primaryRisk || 'N/A', // Renamed
+          "Risk Identified": r.primaryRisk || 'N/A', // Renamed from Risk Score
           Score: getCompliancePercentage(r) + '%'
       }));
       exportToCSV(cleanMarketData, 'market_data.csv');
@@ -1359,53 +1366,106 @@ const ComplianceReport = ({ report }) => {
                 <List className="w-6 h-6 mr-3 text-amber-400"/> Comprehensive Compliance Report
             </h2>
 
-            {/* --- Executive Summary Section --- */}
-            <div className="mb-8 p-6 bg-slate-700/50 rounded-xl border border-blue-600/50">
-                <h3 className="text-2xl font-bold text-blue-300 mb-3 flex items-center">
-                    <FileText className="w-5 h-5 mr-2"/> Executive Summary
-                </h3>
-                <p className="text-slate-300 leading-relaxed italic">
-                    {report.executiveSummary}
-                </p>
-            </div>
-            
-            {/* --- Score Visualization Section --- */}
-            <div className="mb-10 p-5 bg-slate-700/50 rounded-xl border border-amber-600/50 shadow-inner">
-                <div className="p-4 bg-slate-900 rounded-xl border border-slate-700 text-center">
-                    <p className="text-sm font-semibold text-white flex items-center justify-center mb-1">
-                        <BarChart2 className="w-4 h-4 mr-1 text-slate-400"/> Standard Compliance Percentage (Unweighted):
+            {/* --- ZONE 1: AI Executive Summary (The Writer) --- */}
+            {report.generatedExecutiveSummary && (
+                <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/40 to-slate-800 rounded-xl border border-blue-500/30">
+                    <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-xl font-bold text-blue-200 flex items-center">
+                            <Award className="w-5 h-5 mr-2 text-yellow-400"/> AI-Suggested Executive Summary
+                        </h3>
+                        <button 
+                            onClick={() => navigator.clipboard.writeText(report.generatedExecutiveSummary)}
+                            className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded transition"
+                        >
+                            <Copy className="w-3 h-3 mr-1"/> Copy Text
+                        </button>
+                    </div>
+                    <p className="text-slate-300 italic leading-relaxed border-l-4 border-blue-500 pl-4">
+                        "{report.generatedExecutiveSummary}"
                     </p>
-                    <div className="text-5xl font-extrabold text-amber-400 tracking-wide">
-                        {overallPercentage}%
+                    <p className="text-xs text-slate-500 mt-2">💡 Tip: Use this paragraph to start your proposal.</p>
+                </div>
+            )}
+
+            {/* --- ZONE 2: Scoreboard & Persuasion (The Coach) --- */}
+            <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Compliance Score */}
+                <div className="p-5 bg-slate-700/50 rounded-xl border border-amber-600/50 shadow-inner flex flex-col items-center justify-center">
+                    <p className="text-sm font-semibold text-white mb-1 flex items-center"><BarChart2 className="w-4 h-4 mr-2"/> Compliance Score</p>
+                    <div className="text-5xl font-extrabold text-amber-400 tracking-wide">{overallPercentage}%</div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full h-3 bg-slate-900 rounded-full flex overflow-hidden mt-4">
+                        <div style={{ width: getWidth('COMPLIANT') }} className="bg-green-500"></div>
+                        <div style={{ width: getWidth('PARTIAL') }} className="bg-amber-500"></div>
+                        <div style={{ width: getWidth('NON-COMPLIANT') }} className="bg-red-500"></div>
+                    </div>
+                    <div className="flex justify-between w-full text-xs text-slate-400 mt-2 px-1">
+                        <span>Pass</span><span>Partial</span><span>Fail</span>
                     </div>
                 </div>
 
-                {/* Stacked Bar Chart */}
-                <div className="h-4 bg-slate-900 rounded-full flex overflow-hidden mt-6 mb-4">
-                    <div 
-                        style={{ width: getWidth('COMPLIANT') }} 
-                        className="bg-green-500 transition-all duration-500"
-                        title={`${counts.COMPLIANT} Compliant`}
-                    ></div>
-                    <div 
-                        style={{ width: getWidth('PARTIAL') }} 
-                        className="bg-amber-500 transition-all duration-500"
-                        title={`${counts.PARTIAL} Partial`}
-                    ></div>
-                    <div 
-                        style={{ width: getWidth('NON-COMPLIANT') }} 
-                        className="bg-red-500 transition-all duration-500"
-                        title={`${counts['NON-COMPLIANT']} Non-Compliant`}
-                    ></div>
-                </div>
-
-                {/* Key Metrics */}
-                <div className="grid grid-cols-3 gap-4 text-center text-sm font-medium">
-                    <MetricPill label="Compliant" count={counts.COMPLIANT} color="text-green-400" />
-                    <MetricPill label="Partial" count={counts.PARTIAL} color="text-amber-400" />
-                    <MetricPill label="Non-Compliant" count={counts['NON-COMPLIANT']} color="text-red-400" />
-                </div>
+                {/* Persuasion Score */}
+                {report.persuasionScore !== undefined && (
+                    <div className="p-5 bg-slate-700/50 rounded-xl border border-purple-600/50 shadow-inner flex flex-col items-center justify-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-10"><Activity className="w-24 h-24 text-purple-400"/></div>
+                        <p className="text-sm font-semibold text-white mb-1 flex items-center"><Activity className="w-4 h-4 mr-2 text-purple-400"/> Persuasion Score</p>
+                        <div className="text-5xl font-extrabold text-purple-300 tracking-wide">{report.persuasionScore}/100</div>
+                        <div className="mt-3 flex flex-wrap justify-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-purple-900/50 border border-purple-500 text-xs text-purple-200 font-bold uppercase">
+                                Tone: {report.toneAnalysis || 'Neutral'}
+                            </span>
+                        </div>
+                        {report.weakWords && report.weakWords.length > 0 && (
+                            <p className="text-xs text-slate-400 mt-3 text-center">
+                                ⚠️ Weak words detected: <span className="italic text-red-300">{report.weakWords.join(", ")}</span>
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* --- ZONE 3: The War Room (Win/Lose & Risks) --- */}
+            {report.procurementVerdict && (
+                <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Why You Win */}
+                    <div className="p-5 bg-green-900/20 rounded-xl border border-green-800">
+                        <h4 className="text-lg font-bold text-green-400 mb-3 flex items-center"><ThumbsUp className="w-5 h-5 mr-2"/> Why Buyer Says YES</h4>
+                        <ul className="space-y-2">
+                            {report.procurementVerdict.winningFactors?.map((factor, i) => (
+                                <li key={i} className="flex items-start text-sm text-green-200">
+                                    <CheckCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0"/> {factor}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    {/* Why You Lose */}
+                    <div className="p-5 bg-red-900/20 rounded-xl border border-red-800">
+                        <h4 className="text-lg font-bold text-red-400 mb-3 flex items-center"><ThumbsDown className="w-5 h-5 mr-2"/> Why Buyer Says NO</h4>
+                        <ul className="space-y-2">
+                            {report.procurementVerdict.losingFactors?.map((factor, i) => (
+                                <li key={i} className="flex items-start text-sm text-red-200">
+                                    <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0"/> {factor}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
+
+            {/* Legal Risk Alert */}
+            {report.legalRiskAlerts && report.legalRiskAlerts.length > 0 && (
+                <div className="mb-10 p-5 bg-red-950/50 rounded-xl border border-red-600 flex items-start">
+                    <Gavel className="w-8 h-8 text-red-500 mr-4 flex-shrink-0 mt-1"/>
+                    <div>
+                        <h4 className="text-lg font-bold text-red-400 mb-1">Legal Risk Detected</h4>
+                        <p className="text-sm text-red-200 mb-2">You accepted the following dangerous clauses without pushback:</p>
+                        <ul className="list-disc list-inside text-sm text-red-300 space-y-1">
+                            {report.legalRiskAlerts.map((risk, i) => <li key={i}>{risk}</li>)}
+                        </ul>
+                    </div>
+                </div>
+            )}
 
             {/* --- Detailed Findings Matrix --- */}
             <h3 className="text-2xl font-bold text-white mb-6 border-b border-slate-700 pb-3">
@@ -1457,6 +1517,26 @@ const ComplianceReport = ({ report }) => {
                     </div>
                 ))}
             </div>
+
+            {/* --- ZONE 4: Submission Checklist (The Project Manager) --- */}
+            {report.submissionChecklist && report.submissionChecklist.length > 0 && (
+                <div className="mt-12 p-6 bg-slate-700/30 rounded-xl border border-slate-600 border-dashed">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                        <Paperclip className="w-5 h-5 mr-2 text-slate-400"/> Final Submission Artifact Checklist
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {report.submissionChecklist.map((artifact, i) => (
+                            <div key={i} className="flex items-center p-3 bg-slate-800 rounded-lg border border-slate-700">
+                                <input type="checkbox" className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 ring-offset-gray-800 mr-3"/>
+                                <span className="text-sm text-slate-300">{artifact}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-4 text-center">
+                        * Ensure all above documents are attached to your final PDF before submission.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
