@@ -32,11 +32,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONSTANTS ---
-// SECURITY UPDATE: Point to our own backend proxy instead of Google directly.
 const API_URL = '/api/analyze'; 
-
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
-const MAX_FREE_AUDITS = 3; // HARD LIMIT for Non-Admins
+const MAX_FREE_AUDITS = 3; 
 
 const PAGE = {
     HOME: 'HOME',
@@ -54,12 +52,14 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         "projectTitle": { "type": "STRING", "description": "Official Project Title from RFQ." },
         "rfqScopeSummary": { "type": "STRING", "description": "High-level scope summary from RFQ." },
         "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
-        "industryTag": { "type": "STRING", "description": "Industry Sector." },
+        "industryTag": { 
+            "type": "STRING", 
+            "description": "STRICTLY classify into ONE of these exact categories: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'."
+        },
         "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
         "projectLocation": { "type": "STRING", "description": "Geographic location." },
         "contractDuration": { "type": "STRING", "description": "Proposed timeline." },
         "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
-        "incumbentSystem": { "type": "STRING", "description": "Legacy system being replaced." },
         "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
 
         // --- USER COACHING FIELDS ---
@@ -180,6 +180,7 @@ const processFile = (file) => {
     });
 };
 
+// --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null }; }
     static getDerivedStateFromError(error) { return { hasError: true }; }
@@ -490,9 +491,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            // --- FIX: SMART NAVIGATION ---
-            // We don't set page here immediately. We let the App's useEffect handle it based on the User Role.
-            // Just clear error and let the auth state listener do the work.
+            // No direct navigation here; App effect handles role-based redirect
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -554,10 +553,43 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
   useEffect(() => {
     getDocs(collection(getFirestore(), 'users')).then(snap => setUserList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
+  
   const exportToCSV = (data, filename) => {
+    if (!data || !data.length) return;
     const csvContent = "data:text/csv;charset=utf-8," + Object.keys(data[0]).join(",") + "\n" + data.map(e => Object.values(e).map(v => `"${v}"`).join(",")).join("\n");
     const link = document.createElement("a"); link.href = encodeURI(csvContent); link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
+
+  const handleVendorExport = () => {
+      const cleanVendorData = userList.map(u => ({
+          "Full Name": u.name || '',
+          "Designation": u.designation || '',
+          "Company": u.company || '',
+          "Email": u.email || '',
+          "Contact Number": u.phone || '',
+          "Role": u.role || 'USER'
+      }));
+      exportToCSV(cleanVendorData, 'vendor_registry.csv');
+  };
+
+  const handleMarketExport = () => {
+      const cleanMarketData = reportsHistory.map(r => ({
+          ID: r.id,
+          Project: r.projectTitle || r.rfqName,
+          "Scope of Work": r.rfqScopeSummary || 'N/A',
+          Vendor: userList.find(u => u.id === r.ownerId)?.name || 'Unknown',
+          Industry: r.industryTag || 'Unknown',
+          Value: r.grandTotalValue || 'Unknown',
+          Location: r.projectLocation || 'N/A',
+          Duration: r.contractDuration || 'N/A',
+          "Tech Stack": r.techKeywords || 'N/A',
+          Regulations: r.requiredCertifications || 'N/A',
+          "Risk Identified": r.primaryRisk || 'N/A',
+          Score: getCompliancePercentage(r) + '%'
+      }));
+      exportToCSV(cleanMarketData, 'market_data.csv');
+  };
+
   return (
     <div id="admin-print-area" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 space-y-8">
       <div className="flex justify-between items-center border-b border-slate-700 pb-4">
@@ -567,14 +599,13 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
             <button onClick={() => setCurrentPage('HOME')} className="text-sm text-slate-400 hover:text-amber-500 flex items-center"><ArrowLeft className="w-4 h-4 mr-1" /> Logout</button>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
-        <button onClick={() => setCurrentPage('COMPLIANCE_CHECK')} className="p-4 bg-blue-600 rounded-xl text-white font-semibold flex justify-center"><FileUp className="w-5 h-5 mr-2" /> Compliance Check</button>
-        <button onClick={() => setCurrentPage('HISTORY')} className="p-4 bg-slate-600 rounded-xl text-white font-semibold flex justify-center"><List className="w-5 h-5 mr-2" /> View History</button>
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 no-print">
+        <button onClick={() => setCurrentPage('HISTORY')} className="p-4 bg-slate-600 hover:bg-slate-500 rounded-xl text-white font-semibold flex items-center justify-center text-lg transition-all shadow-lg"><List className="w-5 h-5 mr-2" /> View Full Report History</button>
       </div>
       <div className="pt-4 border-t border-slate-700">
         <div className="flex justify-between mb-4">
             <h3 className="text-xl font-bold text-white flex items-center"><Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Feed</h3>
-            <button onClick={() => exportToCSV(reportsHistory.map(r => ({ ID: r.id, Project: r.projectTitle || r.rfqName, Scope: r.rfqScopeSummary, Vendor: userList.find(u => u.id === r.ownerId)?.name, Industry: r.industryTag, Value: r.grandTotalValue, Location: r.projectLocation, Duration: r.contractDuration, Tech: r.techKeywords, Incumbent: r.incumbentSystem, Regulations: r.requiredCertifications, Risk: r.primaryRisk, Score: getCompliancePercentage(r) + '%' })), 'market.csv')} className="text-xs bg-green-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button>
+            <button onClick={handleMarketExport} className="text-xs bg-green-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button>
         </div>
         <div className="space-y-4">{reportsHistory.slice(0, 15).map(item => (
             <div key={item.id} onClick={() => loadReportFromHistory(item)} className="p-4 bg-slate-900/50 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-900">
@@ -590,7 +621,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
         ))}</div>
       </div>
       <div className="pt-4 border-t border-slate-700">
-         <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-white"><Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry</h3><button onClick={() => exportToCSV(userList.map(u => ({ Name: u.name, Company: u.company, Role: u.role, Email: u.email })), 'vendors.csv')} className="text-xs bg-blue-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button></div>
+         <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-white"><Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry</h3><button onClick={handleVendorExport} className="text-xs bg-blue-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button></div>
          <div className="max-h-64 overflow-y-auto bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-4">
             <table className="w-full text-left text-sm text-slate-400">
                 <thead className="bg-slate-800 text-white"><tr><th className="p-2">Name</th><th className="p-2">Company</th><th className="p-2">Role</th></tr></thead>
@@ -600,34 +631,6 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
       </div>
     </div>
   );
-};
-
-const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentUser, loading, RFQFile, BidFile, setRFQFile, setBidFile, generateTestData, errorMessage, report, saveReport, saving, setErrorMessage, userId }) => {
-    return (
-        <>
-            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
-                <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
-                    <h2 className="text-2xl font-bold text-white">{title}</h2>
-                    <div className="text-right">
-                        {currentUser?.role === 'ADMIN' ? <p className="text-xs text-green-400 font-bold">Admin Mode: Unlimited</p> : <p className="text-xs text-slate-400">Audits Used: <span className={usageLimits >= MAX_FREE_AUDITS ? "text-red-500" : "text-green-500"}>{usageLimits}/{MAX_FREE_AUDITS}</span></p>}
-                        <button onClick={() => setCurrentPage(PAGE.HOME)} className="text-sm text-slate-400 hover:text-amber-500 block ml-auto mt-1">Logout</button>
-                    </div>
-                </div>
-                <button onClick={generateTestData} disabled={loading} className="mb-6 w-full flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl text-slate-900 bg-teal-400 hover:bg-teal-300 disabled:opacity-30"><Zap className="h-5 w-5 mr-2" /> LOAD DEMO DOCUMENTS</button>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <FileUploader title="RFQ Document" file={RFQFile} setFile={(e) => handleFileChange(e, setRFQFile, setErrorMessage)} color="blue" requiredText="Mandatory Requirements" />
-                    <FileUploader title="Bid Proposal" file={BidFile} setFile={(e) => handleFileChange(e, setBidFile, setErrorMessage)} color="green" requiredText="Response Document" />
-                </div>
-                {errorMessage && <div className="mt-6 p-4 bg-red-900/40 text-red-300 border border-red-700 rounded-xl flex items-center"><AlertTriangle className="w-5 h-5 mr-3"/>{errorMessage}</div>}
-                <button onClick={() => handleAnalyze('BIDDER')} disabled={loading || !RFQFile || !BidFile} className="mt-8 w-full flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl text-slate-900 bg-amber-500 hover:bg-amber-400 disabled:opacity-50">
-                    {loading ? <Loader2 className="animate-spin h-6 w-6 mr-3" /> : <Send className="h-6 w-6 mr-3" />} {loading ? 'ANALYZING...' : 'RUN COMPLIANCE AUDIT'}
-                </button>
-                {report && userId && <button onClick={() => saveReport('BIDDER')} disabled={saving} className="mt-4 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-600 hover:bg-slate-500 disabled:opacity-50"><Save className="h-5 w-5 mr-2" /> {saving ? 'SAVING...' : 'SAVE REPORT'}</button>}
-                {(report || userId) && <button onClick={() => setCurrentPage(PAGE.HISTORY)} className="mt-2 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-700/80 hover:bg-slate-700"><List className="h-5 w-5 mr-2" /> VIEW HISTORY</button>}
-            </div>
-            {report && <ComplianceReport report={report} />}
-        </>
-    );
 };
 
 // --- APP COMPONENT (DEFINED LAST) ---
@@ -647,7 +650,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener (Smart Redirect) ---
+    // --- EFFECT 1: Auth State Listener ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -656,11 +659,9 @@ const App = () => {
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
                     const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
-                    
-                    // SET USER DATA FIRST
                     setCurrentUser({ uid: user.uid, ...userData });
-
-                    // THEN REDIRECT BASED ON ROLE
+                    
+                    // SMART REDIRECT: ADMIN -> ADMIN DASHBOARD, USER -> CHECKER
                     if (userData.role === 'ADMIN') {
                         setCurrentPage(PAGE.ADMIN);
                     } else {
@@ -781,8 +782,9 @@ const App = () => {
                     text: `You are the SmartBid Compliance Auditor & Coach.
                     
                     **TASK 1: Market Intel**
-                    1. EXTRACT 'projectTitle', 'grandTotalValue', 'industryTag', 'primaryRisk', 'rfqScopeSummary'.
-                    2. EXTRACT 'projectLocation', 'contractDuration', 'techKeywords', 'incumbentSystem', 'requiredCertifications'.
+                    1. EXTRACT 'projectTitle', 'grandTotalValue', 'primaryRisk', 'rfqScopeSummary'.
+                    2. EXTRACT 'projectLocation', 'contractDuration', 'techKeywords', 'requiredCertifications'.
+                    3. CLASSIFY 'industryTag': STRICTLY choose one: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'.
 
                     **TASK 2: Bid Coaching**
                     1. GENERATE 'generatedExecutiveSummary': MANDATORY: Start by referencing the specific Project Background from the RFQ, then transition to the Vendor's solution and value proposition.
@@ -874,7 +876,6 @@ const App = () => {
         setTimeout(() => setErrorMessage(null), 3000);
     }, []);
     
-    // --- RENDER PAGE ---
     const renderPage = () => {
         switch (currentPage) {
             case PAGE.HOME:
