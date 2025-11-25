@@ -48,62 +48,36 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report with market intelligence and bid coaching data.",
     properties: {
-        // --- ADMIN / MARKET INTEL FIELDS ---
-        "projectTitle": { "type": "STRING", "description": "Official Project Title from RFQ." },
-        "rfqScopeSummary": { "type": "STRING", "description": "High-level scope summary from RFQ." },
-        "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
-        "industryTag": { "type": "STRING", "description": "Industry Sector." },
-        "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
-        "projectLocation": { "type": "STRING", "description": "Geographic location." },
-        "contractDuration": { "type": "STRING", "description": "Proposed timeline." },
-        "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
-        "incumbentSystem": { "type": "STRING", "description": "Legacy system being replaced." },
-        "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
-
-        // --- USER COACHING FIELDS ---
-        "generatedExecutiveSummary": {
-            "type": "STRING",
-            "description": "Write a comprehensive Executive Summary. MANDATORY STRUCTURE: 1. Clearly state the Project Background/Requirement found in the RFQ (e.g. 'Regarding the Client's need for X...'). 2. State the Vendor's Proposed Solution. 3. State the Vendor's key value proposition. Ensure the tone is professional and bridges the gap between Requirement and Offer."
-        },
-        "persuasionScore": {
-            "type": "NUMBER",
-            "description": "Score from 0-100 based on confidence, active voice, and clarity of the Bid."
-        },
-        "toneAnalysis": {
-            "type": "STRING",
-            "description": "One word describing the bid tone (e.g., 'Confident', 'Passive', 'Vague', 'Aggressive')."
-        },
-        "weakWords": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" },
-            "description": "List up to 3 weak words found (e.g., 'hope', 'believe', 'try')."
-        },
+        "projectTitle": { "type": "STRING" },
+        "rfqScopeSummary": { "type": "STRING" },
+        "grandTotalValue": { "type": "STRING" },
+        "industryTag": { "type": "STRING" },
+        "primaryRisk": { "type": "STRING" },
+        "projectLocation": { "type": "STRING" },
+        "contractDuration": { "type": "STRING" },
+        "techKeywords": { "type": "STRING" },
+        "incumbentSystem": { "type": "STRING" },
+        "requiredCertifications": { "type": "STRING" },
+        "generatedExecutiveSummary": { "type": "STRING" },
+        "persuasionScore": { "type": "NUMBER" },
+        "toneAnalysis": { "type": "STRING" },
+        "weakWords": { "type": "ARRAY", "items": { "type": "STRING" } },
         "procurementVerdict": {
             "type": "OBJECT",
             "properties": {
-                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 strong points of the proposal." },
-                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 weak points or risks in the proposal." }
+                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" } },
+                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" } }
             }
         },
-        "legalRiskAlerts": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" },
-            "description": "List dangerous legal clauses accepted without pushback."
-        },
-        "submissionChecklist": {
-            "type": "ARRAY",
-            "items": { "type": "STRING" },
-            "description": "List of physical artifacts/attachments required by the RFQ."
-        },
-
-        // --- CORE COMPLIANCE FIELDS ---
-        "executiveSummary": { "type": "STRING", "description": "Audit summary." },
+        "legalRiskAlerts": { "type": "ARRAY", "items": { "type": "STRING" } },
+        "submissionChecklist": { "type": "ARRAY", "items": { "type": "STRING" } },
+        "executiveSummary": { "type": "STRING" },
         "findings": {
             type: "ARRAY",
             items: {
                 type: "OBJECT",
                 properties: {
-                    "requirementFromRFQ": { "type": "STRING", "description": "EXACT TEXT of requirement." },
+                    "requirementFromRFQ": { "type": "STRING" },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
                     "flag": { "type": "STRING", "enum": ["COMPLIANT", "PARTIAL", "NON-COMPLIANT"] },
@@ -201,7 +175,8 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-// --- SHARED UI COMPONENTS ---
+// --- COMPONENTS (Defined FIRST to avoid ReferenceErrors) ---
+
 const handleFileChange = (e, setFile, setErrorMessage) => {
     if (e.target.files.length > 0) {
         setFile(e.target.files[0]);
@@ -299,8 +274,6 @@ const FileUploader = ({ title, file, setFile, color, requiredText }) => (
         {file && <p className="text-sm font-medium text-green-400 flex items-center"><CheckCircle className="w-4 h-4 mr-1 text-green-500" /> {file.name}</p>}
     </div>
 );
-
-// --- MAJOR COMPONENTS ---
 
 const ComplianceReport = ({ report }) => {
     const findings = report.findings || []; 
@@ -500,38 +473,107 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
   );
 };
 
-const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentUser, loading, RFQFile, BidFile, setRFQFile, setBidFile, generateTestData, errorMessage, report, saveReport, saving, setErrorMessage, userId }) => {
+// --- AUTH PAGE ---
+// (Defined before App)
+const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) => {
+    const [regForm, setRegForm] = useState({ name: '', designation: '', company: '', email: '', phone: '', password: '' });
+    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleRegChange = (e) => setRegForm({ ...regForm, [e.target.name]: e.target.value });
+    const handleLoginChange = (e) => setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setErrorMessage(null);
+        setIsSubmitting(true);
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, regForm.email, regForm.password);
+            await setDoc(doc(db, 'users', userCred.user.uid), {
+                name: regForm.name,
+                designation: regForm.designation,
+                company: regForm.company,
+                email: regForm.email,
+                phone: regForm.phone,
+                role: 'USER',
+                createdAt: Date.now()
+            });
+            setLoginForm({ email: regForm.email, password: regForm.password });
+            setErrorMessage('SUCCESS: Registration complete! Credentials autofilled. Please Sign In below.');
+        } catch (err) {
+            console.error('Registration error', err);
+            setErrorMessage(err.message || 'Registration failed.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setErrorMessage(null);
+        setIsSubmitting(true);
+        try {
+            await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
+            setCurrentPage(PAGE.COMPLIANCE_CHECK);
+        } catch (err) {
+            console.error('Login error', err);
+            setErrorMessage(err.message || 'Login failed.');
+            setIsSubmitting(false);
+        }
+    };
+
+    const isSuccess = errorMessage && errorMessage.includes('SUCCESS');
+
     return (
-        <>
-            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
-                <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
-                    <h2 className="text-2xl font-bold text-white">{title}</h2>
-                    <div className="text-right">
-                        {currentUser?.role === 'ADMIN' ? <p className="text-xs text-green-400 font-bold">Admin Mode: Unlimited</p> : <p className="text-xs text-slate-400">Audits Used: <span className={usageLimits >= MAX_FREE_AUDITS ? "text-red-500" : "text-green-500"}>{usageLimits}/{MAX_FREE_AUDITS}</span></p>}
-                        <button onClick={() => setCurrentPage(PAGE.HOME)} className="text-sm text-slate-400 hover:text-amber-500 block ml-auto mt-1">Logout</button>
-                    </div>
+        <div className="p-8 bg-slate-800 rounded-2xl shadow-2xl shadow-black/50 border border-slate-700 mt-12 mb-12">
+            <h2 className="text-3xl font-extrabold text-white text-center">Welcome to SmartBids</h2>
+            <p className="text-lg font-medium text-blue-400 text-center mb-6">AI-Driven Bid Compliance Audit: Smarter Bids, Every Time!</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="p-6 bg-slate-700/50 rounded-xl border border-blue-500/50 shadow-inner space-y-4">
+                    <h3 className="text-2xl font-bold text-blue-300 flex items-center mb-4"><UserPlus className="w-6 h-6 mr-2" /> Create Account</h3>
+                    <form onSubmit={handleRegister} className="space-y-3">
+                        <FormInput id="reg-name" label="Full Name *" name="name" value={regForm.name} onChange={handleRegChange} type="text" />
+                        <FormInput id="reg-designation" label="Designation" name="designation" value={regForm.designation} onChange={handleRegChange} type="text" />
+                        <FormInput id="reg-company" label="Company" name="company" value={regForm.company} onChange={handleRegChange} type="text" />
+                        <FormInput id="reg-email" label="Email *" name="email" value={regForm.email} onChange={handleRegChange} type="email" />
+                        <FormInput id="reg-phone" label="Contact Number" name="phone" value={regForm.phone} onChange={handleRegChange} type="tel" placeholder="Optional" />
+                        <FormInput id="reg-password" label="Create Password *" name="password" value={regForm.password} onChange={handleRegChange} type="password" />
+
+                        <button type="submit" disabled={isSubmitting} className={`w-full py-3 text-lg font-semibold rounded-xl text-slate-900 transition-all shadow-lg mt-6 bg-blue-400 hover:bg-blue-300 disabled:opacity-50 flex items-center justify-center`}>
+                            {isSubmitting ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <UserPlus className="h-5 w-5 mr-2" />}
+                            {isSubmitting ? 'Registering...' : 'Register'}
+                        </button>
+                    </form>
                 </div>
-                <button onClick={generateTestData} disabled={loading} className="mb-6 w-full flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl text-slate-900 bg-teal-400 hover:bg-teal-300 disabled:opacity-30"><Zap className="h-5 w-5 mr-2" /> LOAD DEMO DOCUMENTS</button>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <FileUploader title="RFQ Document" file={RFQFile} setFile={(e) => handleFileChange(e, setRFQFile, setErrorMessage)} color="blue" requiredText="Mandatory Requirements" />
-                    <FileUploader title="Bid Proposal" file={BidFile} setFile={(e) => handleFileChange(e, setBidFile, setErrorMessage)} color="green" requiredText="Response Document" />
+
+                <div className="p-6 bg-slate-700/50 rounded-xl border border-green-500/50 shadow-inner flex flex-col justify-center">
+                    <h3 className="text-2xl font-bold text-green-300 flex items-center mb-4"><LogIn className="w-6 h-6 mr-2" /> Sign In</h3>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <FormInput id="login-email" label="Email *" name="email" value={loginForm.email} onChange={handleLoginChange} type="email" />
+                        <FormInput id="login-password" label="Password *" name="password" value={loginForm.password} onChange={handleLoginChange} type="password" />
+
+                        <button type="submit" disabled={isSubmitting} className={`w-full py-3 text-lg font-semibold rounded-xl text-slate-900 transition-all shadow-lg mt-6 bg-green-400 hover:bg-green-300 disabled:opacity-50 flex items-center justify-center`}>
+                            {isSubmitting ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
+                            {isSubmitting ? 'Signing in...' : 'Sign In'}
+                        </button>
+                    </form>
+
+                    {errorMessage && (
+                        <div className={`mt-4 p-3 ${isSuccess ? 'bg-green-900/40 text-green-300 border-green-700' : 'bg-red-900/40 text-red-300 border-red-700'} border rounded-xl flex items-center`}>
+                            {isSuccess ? <CheckCircle className="w-5 h-5 mr-3"/> : <AlertTriangle className="w-5 h-5 mr-3"/>}
+                            <p className="text-sm font-medium">{errorMessage}</p>
+                        </div>
+                    )}
                 </div>
-                {errorMessage && <div className="mt-6 p-4 bg-red-900/40 text-red-300 border border-red-700 rounded-xl flex items-center"><AlertTriangle className="w-5 h-5 mr-3"/>{errorMessage}</div>}
-                <button onClick={() => handleAnalyze('BIDDER')} disabled={loading || !RFQFile || !BidFile} className="mt-8 w-full flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl text-slate-900 bg-amber-500 hover:bg-amber-400 disabled:opacity-50">
-                    {loading ? <Loader2 className="animate-spin h-6 w-6 mr-3" /> : <Send className="h-6 w-6 mr-3" />} {loading ? 'ANALYZING...' : 'RUN COMPLIANCE AUDIT'}
-                </button>
-                {report && userId && <button onClick={() => saveReport('BIDDER')} disabled={saving} className="mt-4 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-600 hover:bg-slate-500 disabled:opacity-50"><Save className="h-5 w-5 mr-2" /> {saving ? 'SAVING...' : 'SAVE REPORT'}</button>}
-                {(report || userId) && <button onClick={() => setCurrentPage(PAGE.HISTORY)} className="mt-2 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-700/80 hover:bg-slate-700"><List className="h-5 w-5 mr-2" /> VIEW HISTORY</button>}
             </div>
-            {report && <ComplianceReport report={report} />}
-        </>
+        </div>
     );
 };
 
-// --- APP COMPONENT (Bottom of file) ---
-// Now App is defined AFTER all sub-components are defined.
-// This fixes the ReferenceError.
-const MainApp = App; 
+// --- APP COMPONENT ---
+// Defined last to ensure all sub-components exist
+const MainApp = App;
 
 function TopLevelApp() {
     return (
