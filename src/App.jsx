@@ -50,36 +50,62 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
     description: "The complete compliance audit report with market intelligence and bid coaching data.",
     properties: {
-        "projectTitle": { "type": "STRING" },
-        "rfqScopeSummary": { "type": "STRING" },
-        "grandTotalValue": { "type": "STRING" },
-        "industryTag": { "type": "STRING" },
-        "primaryRisk": { "type": "STRING" },
-        "projectLocation": { "type": "STRING" },
-        "contractDuration": { "type": "STRING" },
-        "techKeywords": { "type": "STRING" },
-        "incumbentSystem": { "type": "STRING" },
-        "requiredCertifications": { "type": "STRING" },
-        "generatedExecutiveSummary": { "type": "STRING" },
-        "persuasionScore": { "type": "NUMBER" },
-        "toneAnalysis": { "type": "STRING" },
-        "weakWords": { "type": "ARRAY", "items": { "type": "STRING" } },
+        // --- ADMIN / MARKET INTEL FIELDS ---
+        "projectTitle": { "type": "STRING", "description": "Official Project Title from RFQ." },
+        "rfqScopeSummary": { "type": "STRING", "description": "High-level scope summary from RFQ." },
+        "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
+        "industryTag": { "type": "STRING", "description": "Industry Sector." },
+        "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
+        "projectLocation": { "type": "STRING", "description": "Geographic location." },
+        "contractDuration": { "type": "STRING", "description": "Proposed timeline." },
+        "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
+        "incumbentSystem": { "type": "STRING", "description": "Legacy system being replaced." },
+        "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
+
+        // --- USER COACHING FIELDS ---
+        "generatedExecutiveSummary": {
+            "type": "STRING",
+            "description": "Write a comprehensive Executive Summary. MANDATORY STRUCTURE: 1. Clearly state the Project Background/Requirement found in the RFQ (e.g. 'Regarding the Client's need for X...'). 2. State the Vendor's Proposed Solution. 3. State the Vendor's key value proposition. Ensure the tone is professional and bridges the gap between Requirement and Offer."
+        },
+        "persuasionScore": {
+            "type": "NUMBER",
+            "description": "Score from 0-100 based on confidence, active voice, and clarity of the Bid."
+        },
+        "toneAnalysis": {
+            "type": "STRING",
+            "description": "One word describing the bid tone (e.g., 'Confident', 'Passive', 'Vague', 'Aggressive')."
+        },
+        "weakWords": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List up to 3 weak words found (e.g., 'hope', 'believe', 'try')."
+        },
         "procurementVerdict": {
             "type": "OBJECT",
             "properties": {
-                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" } },
-                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" } }
+                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 strong points of the proposal." },
+                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 weak points or risks in the proposal." }
             }
         },
-        "legalRiskAlerts": { "type": "ARRAY", "items": { "type": "STRING" } },
-        "submissionChecklist": { "type": "ARRAY", "items": { "type": "STRING" } },
-        "executiveSummary": { "type": "STRING" },
+        "legalRiskAlerts": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List dangerous legal clauses accepted without pushback."
+        },
+        "submissionChecklist": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List of physical artifacts/attachments required by the RFQ."
+        },
+
+        // --- CORE COMPLIANCE FIELDS ---
+        "executiveSummary": { "type": "STRING", "description": "Audit summary." },
         "findings": {
             type: "ARRAY",
             items: {
                 type: "OBJECT",
                 properties: {
-                    "requirementFromRFQ": { "type": "STRING" },
+                    "requirementFromRFQ": { "type": "STRING", "description": "EXACT TEXT of requirement." },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
                     "flag": { "type": "STRING", "enum": ["COMPLIANT", "PARTIAL", "NON-COMPLIANT"] },
@@ -154,6 +180,7 @@ const processFile = (file) => {
     });
 };
 
+// --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null }; }
     static getDerivedStateFromError(error) { return { hasError: true }; }
@@ -174,7 +201,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-// --- LEAF COMPONENTS ---
+// --- LEAF COMPONENTS (Helpers) ---
 const handleFileChange = (e, setFile, setErrorMessage) => {
     if (e.target.files.length > 0) {
         setFile(e.target.files[0]);
@@ -420,7 +447,7 @@ const ReportHistory = ({ reportsHistory, loadReportFromHistory, isAuthReady, use
     );
 };
 
-// --- PAGE COMPONENTS (AuthPage MUST be defined before App) ---
+// --- PAGE COMPONENTS (AuthPage First) ---
 
 const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) => {
     const [regForm, setRegForm] = useState({ name: '', designation: '', company: '', email: '', phone: '', password: '' });
@@ -571,19 +598,296 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
   );
 };
 
-// --- APP COMPONENT (DEFINED LAST) ---
-const App = () => {
-    // ... App Logic ...
-    // (This was already correct in the previous block, I am wrapping it up here to close the file structure)
-    // Note: The full App logic is already inside the main block provided above. 
-    // I'm just re-stating that 'App' sits here at the bottom.
-    
-    // (Since I provided the FULL file above, please use that ONE block. 
-    // It contains the full 'App' function body correctly placed at the end.)
+const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentUser, loading, RFQFile, BidFile, setRFQFile, setBidFile, generateTestData, errorMessage, report, saveReport, saving, setErrorMessage, userId }) => {
     return (
-        // ... (See full block above for content) ...
+        <>
+            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+                <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
+                    <h2 className="text-2xl font-bold text-white">{title}</h2>
+                    <div className="text-right">
+                        {currentUser?.role === 'ADMIN' ? <p className="text-xs text-green-400 font-bold">Admin Mode: Unlimited</p> : <p className="text-xs text-slate-400">Audits Used: <span className={usageLimits >= MAX_FREE_AUDITS ? "text-red-500" : "text-green-500"}>{usageLimits}/{MAX_FREE_AUDITS}</span></p>}
+                        <button onClick={() => setCurrentPage(PAGE.HOME)} className="text-sm text-slate-400 hover:text-amber-500 block ml-auto mt-1">Logout</button>
+                    </div>
+                </div>
+                <button onClick={generateTestData} disabled={loading} className="mb-6 w-full flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl text-slate-900 bg-teal-400 hover:bg-teal-300 disabled:opacity-30"><Zap className="h-5 w-5 mr-2" /> LOAD DEMO DOCUMENTS</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FileUploader title="RFQ Document" file={RFQFile} setFile={(e) => handleFileChange(e, setRFQFile, setErrorMessage)} color="blue" requiredText="Mandatory Requirements" />
+                    <FileUploader title="Bid Proposal" file={BidFile} setFile={(e) => handleFileChange(e, setBidFile, setErrorMessage)} color="green" requiredText="Response Document" />
+                </div>
+                {errorMessage && <div className="mt-6 p-4 bg-red-900/40 text-red-300 border border-red-700 rounded-xl flex items-center"><AlertTriangle className="w-5 h-5 mr-3"/>{errorMessage}</div>}
+                <button onClick={() => handleAnalyze('BIDDER')} disabled={loading || !RFQFile || !BidFile} className="mt-8 w-full flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl text-slate-900 bg-amber-500 hover:bg-amber-400 disabled:opacity-50">
+                    {loading ? <Loader2 className="animate-spin h-6 w-6 mr-3" /> : <Send className="h-6 w-6 mr-3" />} {loading ? 'ANALYZING...' : 'RUN COMPLIANCE AUDIT'}
+                </button>
+                {report && userId && <button onClick={() => saveReport('BIDDER')} disabled={saving} className="mt-4 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-600 hover:bg-slate-500 disabled:opacity-50"><Save className="h-5 w-5 mr-2" /> {saving ? 'SAVING...' : 'SAVE REPORT'}</button>}
+                {(report || userId) && <button onClick={() => setCurrentPage(PAGE.HISTORY)} className="mt-2 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-700/80 hover:bg-slate-700"><List className="h-5 w-5 mr-2" /> VIEW HISTORY</button>}
+            </div>
+            {report && <ComplianceReport report={report} />}
+        </>
+    );
+};
+
+// --- APP COMPONENT (DEFINED LAST TO FIX REFERENCE ERROR) ---
+const App = () => {
+    const [currentPage, setCurrentPage] = useState(PAGE.HOME);
+    const [errorMessage, setErrorMessage] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [usageLimits, setUsageLimits] = useState({ initiatorChecks: 0, bidderChecks: 0, isSubscribed: false });
+    const [reportsHistory, setReportsHistory] = useState([]);
+    const [showPaywall, setShowPaywall] = useState(false);
+    
+    const [RFQFile, setRFQFile] = useState(null);
+    const [BidFile, setBidFile] = useState(null);
+    const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    // --- EFFECT 1: Auth State Listener ---
+    useEffect(() => {
+        if (!auth) return;
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setUserId(user.uid);
+                setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        setCurrentUser({ uid: user.uid, ...userDoc.data() });
+                    } else {
+                        setCurrentUser({ uid: user.uid, role: 'USER' });
+                    }
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
+                    setCurrentUser({ uid: user.uid, role: 'USER' });
+                }
+            } else {
+                setUserId(null);
+                setCurrentUser(null);
+                setCurrentPage(PAGE.HOME);
+            }
+            setIsAuthReady(true);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // --- EFFECT 2: Usage Limits Listener ---
+    useEffect(() => {
+        if (db && userId) {
+            const docRef = getUsageDocRef(db, userId);
+            const unsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    setUsageLimits({ 
+                        bidderChecks: docSnap.data().bidderChecks || 0, 
+                        isSubscribed: docSnap.data().isSubscribed || false 
+                    });
+                } else {
+                    const initialData = { initiatorChecks: 0, bidderChecks: 0, isSubscribed: false };
+                    setDoc(docRef, initialData).catch(e => console.error("Error creating usage doc:", e));
+                    setUsageLimits(initialData);
+                }
+            }, (error) => console.error("Error listening to usage limits:", error));
+            return () => unsubscribe();
+        }
+    }, [userId]);
+
+    // --- EFFECT 3: Report History Listener ---
+    useEffect(() => {
+        if (!db || !currentUser) return;
+        let unsubscribeSnapshot = null;
+        let q;
+        try {
+            if (currentUser.role === 'ADMIN') {
+                const collectionGroupRef = collectionGroup(db, 'compliance_reports');
+                q = query(collectionGroupRef);
+            } else if (userId) {
+                const reportsRef = getReportsCollectionRef(db, userId);
+                q = query(reportsRef);
+            }
+            if (q) {
+                unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                    const history = [];
+                    snapshot.forEach(docSnap => {
+                        const ownerId = docSnap.ref.parent.parent ? docSnap.ref.parent.parent.id : userId;
+                        history.push({ id: docSnap.id, ownerId: ownerId, ...docSnap.data() });
+                    });
+                    history.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    setReportsHistory(history);
+                });
+            }
+        } catch (err) { console.error("Error setting up history listener:", err); }
+        return () => unsubscribeSnapshot && unsubscribeSnapshot();
+    }, [userId, currentUser]);
+
+    // --- EFFECT 4: Load Libraries ---
+    useEffect(() => {
+        const loadScript = (src) => {
+            return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = () => reject();
+                document.head.appendChild(script);
+            });
+        };
+        const loadAllLibraries = async () => {
+            try {
+                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js");
+                if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth.js/1.4.15/mammoth.browser.min.js");
+            } catch (e) { console.warn("Doc parsing libs failed."); }
+        };
+        loadAllLibraries();
+    }, []); 
+
+    const incrementUsage = async () => {
+        if (!db || !userId) return;
+        const docRef = getUsageDocRef(db, userId);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const docSnap = await transaction.get(docRef);
+                const currentData = docSnap.exists() ? docSnap.data() : { bidderChecks: 0, isSubscribed: false };
+                if (!docSnap.exists()) transaction.set(docRef, currentData);
+                transaction.update(docRef, { bidderChecks: (currentData.bidderChecks || 0) + 1 });
+            });
+        } catch (e) { console.error("Usage update failed:", e); }
+    };
+
+    const handleAnalyze = useCallback(async (role) => {
+        if (currentUser?.role !== 'ADMIN' && !usageLimits.isSubscribed && usageLimits.bidderChecks >= MAX_FREE_AUDITS) {
+            setShowPaywall(true);
+            return;
+        }
+        if (!RFQFile || !BidFile) { setErrorMessage("Please upload both documents."); return; }
+        setLoading(true); setReport(null); setErrorMessage(null);
+
+        try {
+            const rfqContent = await processFile(RFQFile);
+            const bidContent = await processFile(BidFile);
+            
+            const systemPrompt = {
+                parts: [{
+                    text: `You are the SmartBid Compliance Auditor & Coach.
+                    
+                    **TASK 1: Market Intel**
+                    1. EXTRACT 'projectTitle', 'grandTotalValue', 'industryTag', 'primaryRisk', 'rfqScopeSummary'.
+                    2. EXTRACT 'projectLocation', 'contractDuration', 'techKeywords', 'incumbentSystem', 'requiredCertifications'.
+
+                    **TASK 2: Bid Coaching**
+                    1. GENERATE 'generatedExecutiveSummary': MANDATORY: Start by referencing the specific Project Background from the RFQ, then transition to the Vendor's solution and value proposition.
+                    2. CALCULATE 'persuasionScore' (0-100).
+                    3. ANALYZE 'toneAnalysis' (One word).
+                    4. FIND 'weakWords' (List 3).
+                    5. JUDGE 'procurementVerdict': List 3 'winningFactors' and 3 'losingFactors'.
+                    6. ALERT 'legalRiskAlerts'.
+                    7. CHECK 'submissionChecklist' (List artifacts).
+
+                    **TASK 3: Compliance Audit**
+                    1. Identify mandatory requirements.
+                    2. Score (1/0.5/0).
+                    3. CRITICAL: Copy EXACT text to 'requirementFromRFQ'.
+                    
+                    Output JSON.`
+                }]
+            };
+
+            const userQuery = `RFQ:\n${rfqContent}\n\nBid:\n${bidContent}\n\nPerform audit.`;
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: systemPrompt,
+                generationConfig: { responseMimeType: "application/json", responseSchema: COMPREHENSIVE_REPORT_SCHEMA },
+            };
+
+            const response = await fetchWithRetry(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (jsonText) {
+                setReport(JSON.parse(jsonText));
+                await incrementUsage();
+            } else { throw new Error("AI returned invalid data."); }
+
+        } catch (error) {
+            setErrorMessage(`Analysis failed: ${error.message}`);
+        } finally { setLoading(false); }
+    }, [RFQFile, BidFile, usageLimits, currentUser]);
+
+    const generateTestData = useCallback(async () => {
+        const mockRfqContent = `PROJECT TITLE: OFFSHORE PIPELINE MAINT.\nSCOPE: Inspect pipelines.\n1. TECH: REST API required.`;
+        const mockBidContent = `EXECUTIVE SUMMARY: We will do it.\n1. We use GraphQL.`;
+        setRFQFile(new File([mockRfqContent], "MOCK_RFQ.txt", { type: "text/plain" }));
+        setBidFile(new File([mockBidContent], "MOCK_BID.txt", { type: "text/plain" }));
+        setErrorMessage("Mock docs loaded. Click Run Audit.");
+    }, []);
+
+    const saveReport = useCallback(async (role) => {
+        if (!db || !userId || !report) { setErrorMessage("No report to save."); return; }
+        setSaving(true);
+        try {
+            const reportsRef = getReportsCollectionRef(db, userId);
+            await addDoc(reportsRef, {
+                ...report,
+                rfqName: RFQFile?.name || 'Untitled',
+                bidName: BidFile?.name || 'Untitled',
+                timestamp: Date.now(),
+                role: role, 
+            });
+            setErrorMessage("Report saved successfully!"); 
+            setTimeout(() => setErrorMessage(null), 3000);
+        } catch (error) {
+            setErrorMessage(`Failed to save: ${error.message}.`);
+        } finally { setSaving(false); }
+    }, [db, userId, report, RFQFile, BidFile]);
+    
+    const deleteReport = useCallback(async (reportId, rfqName, bidName) => {
+        if (!db || !userId) return;
+        setErrorMessage(`Deleting...`);
+        try {
+            const reportsRef = getReportsCollectionRef(db, userId);
+            await deleteDoc(doc(reportsRef, reportId));
+            if (report && report.id === reportId) setReport(null);
+            setErrorMessage("Deleted!");
+            setTimeout(() => setErrorMessage(null), 3000);
+        } catch (error) { setErrorMessage(`Delete failed: ${error.message}`); }
+    }, [db, userId, report]);
+
+    const loadReportFromHistory = useCallback((historyItem) => {
+        setRFQFile(null); setBidFile(null);
+        setReport({ id: historyItem.id, ...historyItem });
+        setCurrentPage(PAGE.COMPLIANCE_CHECK); 
+        setErrorMessage(`Loaded: ${historyItem.rfqName}`);
+        setTimeout(() => setErrorMessage(null), 3000);
+    }, []);
+    
+    const renderPage = () => {
+        switch (currentPage) {
+            case PAGE.HOME:
+                return <AuthPage setCurrentPage={setCurrentPage} setErrorMessage={setErrorMessage} errorMessage={errorMessage} db={db} auth={auth} />;
+            case PAGE.COMPLIANCE_CHECK:
+                return <AuditPage 
+                    title="Bidder: Self-Compliance Check" rfqTitle="RFQ" bidTitle="Bid" role="BIDDER"
+                    handleAnalyze={handleAnalyze} usageLimits={usageLimits.bidderChecks} setCurrentPage={setCurrentPage}
+                    currentUser={currentUser} loading={loading} RFQFile={RFQFile} BidFile={BidFile}
+                    setRFQFile={setRFQFile} setBidFile={setBidFile} generateTestData={generateTestData} 
+                    errorMessage={errorMessage} report={report} saveReport={saveReport} saving={saving}
+                    setErrorMessage={setErrorMessage} userId={userId} 
+                />;
+            case PAGE.ADMIN:
+                return <AdminDashboard setCurrentPage={setCurrentPage} currentUser={currentUser} reportsHistory={reportsHistory} loadReportFromHistory={loadReportFromHistory} />;
+            case PAGE.HISTORY:
+                return <ReportHistory reportsHistory={reportsHistory} loadReportFromHistory={loadReportFromHistory} deleteReport={deleteReport} isAuthReady={isAuthReady} userId={userId} setCurrentPage={setCurrentPage} currentUser={currentUser} />;
+            default: return <AuthPage setCurrentPage={setCurrentPage} setErrorMessage={setErrorMessage} errorMessage={errorMessage} db={db} auth={auth} />;
+        }
+    };
+
+    return (
         <div className="min-h-screen bg-slate-900 font-body p-4 sm:p-8 text-slate-100">
-             <style>{`
+            <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
                 .font-body, .font-body * { font-family: 'Lexend', sans-serif !important; }
                 input[type="file"] { display: block; width: 100%; }
