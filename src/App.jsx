@@ -180,7 +180,6 @@ const processFile = (file) => {
     });
 };
 
-// --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component {
     constructor(props) { super(props); this.state = { hasError: false, error: null }; }
     static getDerivedStateFromError(error) { return { hasError: true }; }
@@ -201,7 +200,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-// --- LEAF COMPONENTS (Helpers) ---
+// --- LEAF COMPONENTS ---
 const handleFileChange = (e, setFile, setErrorMessage) => {
     if (e.target.files.length > 0) {
         setFile(e.target.files[0]);
@@ -243,7 +242,10 @@ const PaywallModal = ({ show, onClose }) => {
                     <div className="flex items-center text-sm text-white"><CheckCircle className="w-4 h-4 mr-3 text-green-400"/> AI Sales Coach & Tone Analysis</div>
                     <div className="flex items-center text-sm text-white"><CheckCircle className="w-4 h-4 mr-3 text-green-400"/> Market Intelligence Data</div>
                 </div>
-                <button className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl transition-all shadow-lg mb-3 flex items-center justify-center">
+                <button 
+                    onClick={() => alert("Stripe Integration is coming in the next update!")}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl transition-all shadow-lg mb-3 flex items-center justify-center"
+                >
                     <CreditCard className="w-5 h-5 mr-2"/> Upgrade Now - $10/mo
                 </button>
                 <button onClick={onClose} className="text-sm text-slate-400 hover:text-white">
@@ -488,7 +490,9 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            setCurrentPage(PAGE.COMPLIANCE_CHECK);
+            // --- FIX: SMART NAVIGATION ---
+            // We don't set page here immediately. We let the App's useEffect handle it based on the User Role.
+            // Just clear error and let the auth state listener do the work.
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -626,7 +630,7 @@ const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentU
     );
 };
 
-// --- APP COMPONENT (DEFINED LAST TO FIX REFERENCE ERROR) ---
+// --- APP COMPONENT (DEFINED LAST) ---
 const App = () => {
     const [currentPage, setCurrentPage] = useState(PAGE.HOME);
     const [errorMessage, setErrorMessage] = useState(null);
@@ -643,23 +647,29 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener ---
+    // --- EFFECT 1: Auth State Listener (Smart Redirect) ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid);
-                setCurrentPage(prev => prev === PAGE.HOME ? PAGE.COMPLIANCE_CHECK : prev);
                 try {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
-                    if (userDoc.exists()) {
-                        setCurrentUser({ uid: user.uid, ...userDoc.data() });
+                    const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
+                    
+                    // SET USER DATA FIRST
+                    setCurrentUser({ uid: user.uid, ...userData });
+
+                    // THEN REDIRECT BASED ON ROLE
+                    if (userData.role === 'ADMIN') {
+                        setCurrentPage(PAGE.ADMIN);
                     } else {
-                        setCurrentUser({ uid: user.uid, role: 'USER' });
+                        setCurrentPage(PAGE.COMPLIANCE_CHECK);
                     }
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
                     setCurrentUser({ uid: user.uid, role: 'USER' });
+                    setCurrentPage(PAGE.COMPLIANCE_CHECK);
                 }
             } else {
                 setUserId(null);
@@ -864,6 +874,7 @@ const App = () => {
         setTimeout(() => setErrorMessage(null), 3000);
     }, []);
     
+    // --- RENDER PAGE ---
     const renderPage = () => {
         switch (currentPage) {
             case PAGE.HOME:
@@ -902,6 +913,7 @@ const App = () => {
     );
 };
 
+// --- TOP LEVEL EXPORT ---
 const MainApp = App;
 
 function TopLevelApp() {
