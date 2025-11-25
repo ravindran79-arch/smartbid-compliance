@@ -3,7 +3,7 @@ import {
     FileUp, Send, Loader2, AlertTriangle, CheckCircle, List, FileText, BarChart2,
     Save, Clock, Zap, ArrowLeft, Users, Briefcase, Layers, UserPlus, LogIn, Tag,
     Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity, 
-    Printer, Download, MapPin, Calendar, ThumbsUp, ThumbsDown, Gavel, Paperclip, Copy, Award, Lock, CreditCard
+    Printer, Download, MapPin, Calendar, ThumbsUp, ThumbsDown, Gavel, Paperclip, Copy, Award, Lock, CreditCard, Info
 } from 'lucide-react'; 
 
 // --- FIREBASE IMPORTS ---
@@ -32,11 +32,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONSTANTS ---
-// SECURITY UPDATE: Point to our own backend proxy instead of Google directly.
 const API_URL = '/api/analyze'; 
-
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
-const MAX_FREE_AUDITS = 3; // HARD LIMIT for Non-Admins
+const MAX_FREE_AUDITS = 3; 
 
 const PAGE = {
     HOME: 'HOME',
@@ -332,17 +330,7 @@ const ComplianceReport = ({ report }) => {
                     <div className="p-5 bg-slate-700/50 rounded-xl border border-purple-600/50 text-center relative overflow-hidden">
                         <p className="text-sm font-semibold text-white mb-1"><Activity className="w-4 h-4 inline mr-2 text-purple-400"/> Persuasion Score</p>
                         <div className="text-5xl font-extrabold text-purple-300">{report.persuasionScore}/100</div>
-                        <div className="mt-3 flex flex-wrap justify-center gap-2">
-                            <span className="px-3 py-1 rounded-full bg-purple-900/50 border border-purple-500 text-xs text-purple-200 font-bold uppercase">
-                                Tone: {report.toneAnalysis || 'Neutral'}
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-3 text-center">Based on confidence, active voice, and clarity.</p>
-                        {report.weakWords && report.weakWords.length > 0 && (
-                            <p className="text-xs text-slate-400 mt-1 text-center">
-                                ⚠️ Weak words detected: <span className="italic text-red-300">{report.weakWords.join(", ")}</span>
-                            </p>
-                        )}
+                        <p className="text-xs text-slate-400 mt-3">Based on confidence, active voice, and clarity.</p>
                     </div>
                 )}
             </div>
@@ -461,7 +449,7 @@ const ReportHistory = ({ reportsHistory, loadReportFromHistory, isAuthReady, use
     );
 };
 
-// --- PAGE COMPONENTS (AuthPage First) ---
+// --- PAGE COMPONENTS (Defined BEFORE App) ---
 
 const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) => {
     const [regForm, setRegForm] = useState({ name: '', designation: '', company: '', email: '', phone: '', password: '' });
@@ -502,7 +490,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            // No direct navigation here; App effect handles role-based redirect
+            // No direct navigation; App effect handles it
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -559,6 +547,34 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
     );
 };
 
+const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentUser, loading, RFQFile, BidFile, setRFQFile, setBidFile, generateTestData, errorMessage, report, saveReport, saving, setErrorMessage, userId }) => {
+    return (
+        <>
+            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700">
+                <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
+                    <h2 className="text-2xl font-bold text-white">{title}</h2>
+                    <div className="text-right">
+                        {currentUser?.role === 'ADMIN' ? <p className="text-xs text-green-400 font-bold">Admin Mode: Unlimited</p> : <p className="text-xs text-slate-400">Audits Used: <span className={usageLimits >= MAX_FREE_AUDITS ? "text-red-500" : "text-green-500"}>{usageLimits}/{MAX_FREE_AUDITS}</span></p>}
+                        <button onClick={() => setCurrentPage(PAGE.HOME)} className="text-sm text-slate-400 hover:text-amber-500 block ml-auto mt-1">Logout</button>
+                    </div>
+                </div>
+                <button onClick={generateTestData} disabled={loading} className="mb-6 w-full flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl text-slate-900 bg-teal-400 hover:bg-teal-300 disabled:opacity-30"><Zap className="h-5 w-5 mr-2" /> LOAD DEMO DOCUMENTS</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FileUploader title="RFQ Document" file={RFQFile} setFile={(e) => handleFileChange(e, setRFQFile, setErrorMessage)} color="blue" requiredText="Mandatory Requirements" />
+                    <FileUploader title="Bid Proposal" file={BidFile} setFile={(e) => handleFileChange(e, setBidFile, setErrorMessage)} color="green" requiredText="Response Document" />
+                </div>
+                {errorMessage && <div className="mt-6 p-4 bg-red-900/40 text-red-300 border border-red-700 rounded-xl flex items-center"><AlertTriangle className="w-5 h-5 mr-3"/>{errorMessage}</div>}
+                <button onClick={() => handleAnalyze('BIDDER')} disabled={loading || !RFQFile || !BidFile} className="mt-8 w-full flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl text-slate-900 bg-amber-500 hover:bg-amber-400 disabled:opacity-50">
+                    {loading ? <Loader2 className="animate-spin h-6 w-6 mr-3" /> : <Send className="h-6 w-6 mr-3" />} {loading ? 'ANALYZING...' : 'RUN COMPLIANCE AUDIT'}
+                </button>
+                {report && userId && <button onClick={() => saveReport('BIDDER')} disabled={saving} className="mt-4 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-600 hover:bg-slate-500 disabled:opacity-50"><Save className="h-5 w-5 mr-2" /> {saving ? 'SAVING...' : 'SAVE REPORT'}</button>}
+                {(report || userId) && <button onClick={() => setCurrentPage(PAGE.HISTORY)} className="mt-2 w-full flex items-center justify-center px-8 py-3 text-md font-semibold rounded-xl text-white bg-slate-700/80 hover:bg-slate-700"><List className="h-5 w-5 mr-2" /> VIEW HISTORY</button>}
+            </div>
+            {report && <ComplianceReport report={report} />}
+        </>
+    );
+};
+
 const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadReportFromHistory }) => {
   const [userList, setUserList] = useState([]);
   useEffect(() => {
@@ -568,46 +584,16 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
     const csvContent = "data:text/csv;charset=utf-8," + Object.keys(data[0]).join(",") + "\n" + data.map(e => Object.values(e).map(v => `"${v}"`).join(",")).join("\n");
     const link = document.createElement("a"); link.href = encodeURI(csvContent); link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
-  
   const handleVendorExport = () => {
-      const cleanVendorData = userList.map(u => ({
-          "Full Name": u.name || '',
-          "Designation": u.designation || '',
-          "Company": u.company || '',
-          "Email": u.email || '',
-          "Contact Number": u.phone || '',
-          "Role": u.role || 'USER'
-      }));
+      const cleanVendorData = userList.map(u => ({ "Full Name": u.name, "Designation": u.designation, "Company": u.company, "Email": u.email, "Contact Number": u.phone, "Role": u.role }));
       exportToCSV(cleanVendorData, 'vendor_registry.csv');
   };
-  
   const handleMarketExport = () => {
       const cleanMarketData = reportsHistory.map(r => ({
-          ID: r.id,
-          Project: r.projectTitle || r.rfqName,
-          "Scope of Work": r.rfqScopeSummary || 'N/A',
-          Vendor: userList.find(u => u.id === r.ownerId)?.name || 'Unknown',
-          Industry: r.industryTag || 'Unknown',
-          Value: r.grandTotalValue || 'Unknown',
-          Location: r.projectLocation || 'N/A',
-          Duration: r.contractDuration || 'N/A',
-          "Tech Stack": r.techKeywords || 'N/A',
-          Regulations: r.requiredCertifications || 'N/A',
-          "Risk Identified": r.primaryRisk || 'N/A',
-          "Buying Persona": r.buyingPersona || 'N/A',
-          "Complexity Score": r.complexityScore || 'N/A',
-          "Trap Count": r.trapCount || 'N/A',
-          "Lead Temperature": r.leadTemperature || 'N/A',
-          Score: getCompliancePercentage(r) + '%'
+          ID: r.id, Project: r.projectTitle || r.rfqName, "Scope of Work": r.rfqScopeSummary || 'N/A', Vendor: userList.find(u => u.id === r.ownerId)?.name, Industry: r.industryTag, Value: r.grandTotalValue, Location: r.projectLocation, Duration: r.contractDuration, "Tech Stack": r.techKeywords, Regulations: r.requiredCertifications, "Risk Identified": r.primaryRisk, "Buying Persona": r.buyingPersona, "Complexity Score": r.complexityScore, "Trap Count": r.trapCount, "Lead Temperature": r.leadTemperature, Score: getCompliancePercentage(r) + '%'
       }));
       exportToCSV(cleanMarketData, 'market_data.csv');
   };
-
-  const getUserForReport = (ownerId) => {
-    const found = userList.find(u => u.id === ownerId);
-    return found ? `${found.name} (${found.company})` : `User ID: ${ownerId}`;
-  };
-
   return (
     <div id="admin-print-area" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 space-y-8">
       <div className="flex justify-between items-center border-b border-slate-700 pb-4">
@@ -617,21 +603,23 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
             <button onClick={() => setCurrentPage('HOME')} className="text-sm text-slate-400 hover:text-amber-500 flex items-center"><ArrowLeft className="w-4 h-4 mr-1" /> Logout</button>
         </div>
       </div>
-
       <div className="pt-4 border-t border-slate-700">
         <div className="flex justify-between mb-4">
-            <h3 className="text-xl font-bold text-white flex items-center"><Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Feed</h3>
+            <div className="flex items-center"><h3 className="text-xl font-bold text-white mr-2"><Eye className="w-6 h-6 inline mr-2 text-amber-400" /> Live Market Feed</h3><span className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-400 border border-slate-600 flex items-center"><Info className="w-3 h-3 mr-1"/> Legacy data may show N/A</span></div>
             <button onClick={handleMarketExport} className="text-xs bg-green-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button>
         </div>
         <div className="space-y-4">{reportsHistory.slice(0, 15).map(item => (
             <div key={item.id} className="p-4 bg-slate-900/50 rounded-xl border border-slate-700 cursor-default hover:bg-slate-900">
                 <div className="flex justify-between mb-2">
-                    <div><h4 className="text-lg font-bold text-white">{item.projectTitle || item.rfqName}</h4><p className="text-sm text-slate-400"><MapPin className="w-3 h-3 inline"/> {item.projectLocation} • <Calendar className="w-3 h-3 inline"/> {item.contractDuration}</p></div>
+                    <div>
+                        <h4 className="text-lg font-bold text-white">{item.projectTitle || item.rfqName} <span className="text-xs font-normal text-slate-500 ml-2">{item.industryTag === undefined ? '(LEGACY DATA)' : ''}</span></h4>
+                        <p className="text-sm text-slate-400"><MapPin className="w-3 h-3 inline"/> {item.projectLocation || 'N/A'} • <Calendar className="w-3 h-3 inline"/> {item.contractDuration || 'N/A'}</p>
+                    </div>
                     <div className="text-right"><div className="text-xl font-bold text-green-400">{getCompliancePercentage(item)}%</div><span className="text-slate-500 text-xs">{new Date(item.timestamp).toLocaleDateString()}</span></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                    <p className="text-xs text-green-400 font-bold"><DollarSign className="w-3 h-3 inline"/> {item.grandTotalValue}</p>
-                    <p className="text-xs text-red-400 font-bold"><Activity className="w-3 h-3 inline"/> {item.primaryRisk}</p>
+                    <p className="text-xs text-green-400 font-bold"><DollarSign className="w-3 h-3 inline"/> {item.grandTotalValue || 'N/A'}</p>
+                    <p className="text-xs text-red-400 font-bold"><Activity className="w-3 h-3 inline"/> {item.primaryRisk || 'N/A'}</p>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-700/50">
                     <div><p className="text-xs font-bold text-blue-300">{item.buyingPersona || 'N/A'}</p><p className="text-[10px] text-slate-500">Buyer Priority</p></div>
@@ -644,7 +632,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
       </div>
       <div className="pt-4 border-t border-slate-700">
          <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-white"><Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry</h3><button onClick={handleVendorExport} className="text-xs bg-blue-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button></div>
-         <div className="max-h-64 overflow-y-auto bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-4">
+         <div className="max-h-64 overflow-y-auto bg-slate-900 rounded-xl border border-slate-700">
             <table className="w-full text-left text-sm text-slate-400">
                 <thead className="bg-slate-800 text-slate-200 uppercase font-bold sticky top-0 z-10">
                     <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Designation</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3 text-right">Role</th></tr>
@@ -678,7 +666,6 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -704,7 +691,6 @@ const App = () => {
         return () => unsubscribe();
     }, []);
 
-    // --- EFFECT 2: Usage Limits Listener ---
     useEffect(() => {
         if (db && userId) {
             const docRef = getUsageDocRef(db, userId);
@@ -724,7 +710,6 @@ const App = () => {
         }
     }, [userId]);
 
-    // --- EFFECT 3: Report History Listener ---
     useEffect(() => {
         if (!db || !currentUser) return;
         let unsubscribeSnapshot = null;
@@ -752,7 +737,6 @@ const App = () => {
         return () => unsubscribeSnapshot && unsubscribeSnapshot();
     }, [userId, currentUser]);
 
-    // --- EFFECT 4: Load Libraries ---
     useEffect(() => {
         const loadScript = (src) => {
             return new Promise((resolve, reject) => {
@@ -766,9 +750,9 @@ const App = () => {
         };
         const loadAllLibraries = async () => {
             try {
-                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js");
-                if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-                await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth.js/1.4.15/mammoth.browser.min.js");
+                if (!window.pdfjsLib) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js");
+                if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                if (!window.mammoth) await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth.js/1.4.15/mammoth.browser.min.js");
             } catch (e) { console.warn("Doc parsing libs failed."); }
         };
         loadAllLibraries();
