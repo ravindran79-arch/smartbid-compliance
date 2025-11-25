@@ -3,7 +3,7 @@ import {
     FileUp, Send, Loader2, AlertTriangle, CheckCircle, List, FileText, BarChart2,
     Save, Clock, Zap, ArrowLeft, Users, Briefcase, Layers, UserPlus, LogIn, Tag,
     Shield, User, HardDrive, Phone, Mail, Building, Trash2, Eye, DollarSign, Activity, 
-    Printer, Download, MapPin, Calendar, ThumbsUp, ThumbsDown, Gavel, Paperclip, Copy, Award, Lock, CreditCard, Thermometer, Scale
+    Printer, Download, MapPin, Calendar, ThumbsUp, ThumbsDown, Gavel, Paperclip, Copy, Award, Lock, CreditCard
 } from 'lucide-react'; 
 
 // --- FIREBASE IMPORTS ---
@@ -43,20 +43,24 @@ const PAGE = {
     HISTORY: 'HISTORY' 
 };
 
-// --- JSON SCHEMA (God View 2.0) ---
+// --- JSON SCHEMA ---
 const COMPREHENSIVE_REPORT_SCHEMA = {
     type: "OBJECT",
-    description: "The complete compliance audit report with deep market intelligence.",
+    description: "The complete compliance audit report with market intelligence and bid coaching data.",
     properties: {
         // --- ADMIN / MARKET INTEL FIELDS ---
-        "projectTitle": { "type": "STRING" },
-        "rfqScopeSummary": { "type": "STRING" },
-        "grandTotalValue": { "type": "STRING" },
-        "industryTag": { "type": "STRING" },
-        "projectLocation": { "type": "STRING" },
-        "contractDuration": { "type": "STRING" },
-        "techKeywords": { "type": "STRING" },
-        "requiredCertifications": { "type": "STRING" },
+        "projectTitle": { "type": "STRING", "description": "Official Project Title from RFQ." },
+        "rfqScopeSummary": { "type": "STRING", "description": "High-level scope summary from RFQ." },
+        "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
+        "industryTag": { 
+            "type": "STRING", 
+            "description": "STRICTLY classify into ONE of these exact categories: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'."
+        },
+        "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
+        "projectLocation": { "type": "STRING", "description": "Geographic location." },
+        "contractDuration": { "type": "STRING", "description": "Proposed timeline." },
+        "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
+        "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
 
         // --- NEW STRATEGIC METRICS ---
         "buyingPersona": { 
@@ -75,33 +79,51 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
             "type": "STRING", 
             "description": "Assess the probability of winning based on the Bidder's match to requirements. Options: 'HOT LEAD' (High Match), 'WARM LEAD' (Medium), 'COLD LEAD' (Low)." 
         },
-        // -----------------------------
-
-        "primaryRisk": { "type": "STRING" },
 
         // --- USER COACHING FIELDS ---
-        "generatedExecutiveSummary": { "type": "STRING" },
-        "persuasionScore": { "type": "NUMBER" },
-        "toneAnalysis": { "type": "STRING" },
-        "weakWords": { "type": "ARRAY", "items": { "type": "STRING" } },
+        "generatedExecutiveSummary": {
+            "type": "STRING",
+            "description": "Write a comprehensive Executive Summary. MANDATORY STRUCTURE: 1. Clearly state the Project Background/Requirement found in the RFQ (e.g. 'Regarding the Client's need for X...'). 2. State the Vendor's Proposed Solution. 3. State the Vendor's key value proposition."
+        },
+        "persuasionScore": {
+            "type": "NUMBER",
+            "description": "Score from 0-100 based on confidence, active voice, and clarity of the Bid."
+        },
+        "toneAnalysis": {
+            "type": "STRING",
+            "description": "One word describing the bid tone (e.g., 'Confident', 'Passive', 'Vague', 'Aggressive')."
+        },
+        "weakWords": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List up to 3 weak words found (e.g., 'hope', 'believe', 'try')."
+        },
         "procurementVerdict": {
             "type": "OBJECT",
             "properties": {
-                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" } },
-                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" } }
+                "winningFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 strong points of the proposal." },
+                "losingFactors": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "Top 3 weak points or risks in the proposal." }
             }
         },
-        "legalRiskAlerts": { "type": "ARRAY", "items": { "type": "STRING" } },
-        "submissionChecklist": { "type": "ARRAY", "items": { "type": "STRING" } },
+        "legalRiskAlerts": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List dangerous legal clauses accepted without pushback."
+        },
+        "submissionChecklist": {
+            "type": "ARRAY",
+            "items": { "type": "STRING" },
+            "description": "List of physical artifacts/attachments required by the RFQ."
+        },
 
         // --- CORE COMPLIANCE FIELDS ---
-        "executiveSummary": { "type": "STRING" },
+        "executiveSummary": { "type": "STRING", "description": "Audit summary." },
         "findings": {
             "type": "ARRAY",
             "items": {
                 "type": "OBJECT",
                 "properties": {
-                    "requirementFromRFQ": { "type": "STRING" },
+                    "requirementFromRFQ": { "type": "STRING", "description": "EXACT TEXT of requirement." },
                     "complianceScore": { "type": "NUMBER" },
                     "bidResponseSummary": { "type": "STRING" },
                     "flag": { "type": "STRING", "enum": ["COMPLIANT", "PARTIAL", "NON-COMPLIANT"] },
@@ -260,6 +282,21 @@ const DetailItem = ({ icon: Icon, label, value }) => (
     </div>
 );
 
+const UserCard = ({ user }) => (
+  <div className="p-4 bg-slate-900 rounded-xl border border-slate-700 shadow-md">
+    <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-2">
+      <p className="text-xl font-bold text-white flex items-center"><User className="w-5 h-5 mr-2 text-amber-400" />{user.name}</p>
+      <span className={`text-xs px-3 py-1 rounded-full font-semibold ${user.role === 'ADMIN' ? 'bg-red-500 text-white' : 'bg-green-500 text-slate-900'}`}>{user.role}</span>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-4">
+      <DetailItem icon={Briefcase} label="Designation" value={user.designation} />
+      <DetailItem icon={Building} label="Company" value={user.company} />
+      <DetailItem icon={Mail} label="Email" value={user.email} />
+      <DetailItem icon={Phone} label="Contact" value={user.phone || 'N/A'} />
+    </div>
+  </div>
+);
+
 const StatCard = ({ icon, label, value }) => (
   <div className="bg-slate-900 p-6 rounded-xl border border-slate-700 flex items-center space-x-4">
     <div className="flex-shrink-0">{icon}</div>
@@ -311,7 +348,17 @@ const ComplianceReport = ({ report }) => {
                     <div className="p-5 bg-slate-700/50 rounded-xl border border-purple-600/50 text-center relative overflow-hidden">
                         <p className="text-sm font-semibold text-white mb-1"><Activity className="w-4 h-4 inline mr-2 text-purple-400"/> Persuasion Score</p>
                         <div className="text-5xl font-extrabold text-purple-300">{report.persuasionScore}/100</div>
-                        <p className="text-xs text-slate-400 mt-3">Based on confidence, active voice, and clarity.</p>
+                        <div className="mt-3 flex flex-wrap justify-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-purple-900/50 border border-purple-500 text-xs text-purple-200 font-bold uppercase">
+                                Tone: {report.toneAnalysis || 'Neutral'}
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-3 text-center">Based on confidence, active voice, and clarity.</p>
+                        {report.weakWords && report.weakWords.length > 0 && (
+                            <p className="text-xs text-slate-400 mt-1 text-center">
+                                ⚠️ Weak words detected: <span className="italic text-red-300">{report.weakWords.join(", ")}</span>
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
@@ -470,18 +517,8 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setErrorMessage(null);
         setIsSubmitting(true);
         try {
-            const userCred = await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            
-            // FORCE NAVIGATION (Instant)
-            const userDoc = await getDoc(doc(db, 'users', userCred.user.uid));
-            const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
-            
-            if (userData.role === 'ADMIN') {
-                setCurrentPage(PAGE.ADMIN);
-            } else {
-                setCurrentPage(PAGE.COMPLIANCE_CHECK);
-            }
-
+            await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
+            // No direct navigation here; App effect handles role-based redirect
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -538,22 +575,12 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
     );
 };
 
-const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
+const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadReportFromHistory }) => {
   const [userList, setUserList] = useState([]);
-
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const snapshot = await getDocs(collection(getFirestore(), 'users'));
-        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUserList(users);
-      } catch (err) {
-        console.error('Error fetching users:', err);
-      }
-    };
-    fetchUsers();
+    getDocs(collection(getFirestore(), 'users')).then(snap => setUserList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
-
+  
   const exportToCSV = (data, filename) => {
     if (!data || !data.length) return;
     const csvContent = "data:text/csv;charset=utf-8," + Object.keys(data[0]).join(",") + "\n" + data.map(e => Object.values(e).map(v => `"${v}"`).join(",")).join("\n");
@@ -585,21 +612,13 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
           "Tech Stack": r.techKeywords || 'N/A',
           Regulations: r.requiredCertifications || 'N/A',
           "Risk Identified": r.primaryRisk || 'N/A',
-          // --- NEW METRICS FOR CSV ---
           "Buying Persona": r.buyingPersona || 'N/A',
           "Complexity Score": r.complexityScore || 'N/A',
           "Trap Count": r.trapCount || 'N/A',
           "Lead Temperature": r.leadTemperature || 'N/A',
-          // ---------------------------
           Score: getCompliancePercentage(r) + '%'
       }));
       exportToCSV(cleanMarketData, 'market_data.csv');
-  };
-
-  // Helper for Report User
-  const getUserForReport = (ownerId) => {
-    const found = userList.find(u => u.id === ownerId);
-    return found ? `${found.name} (${found.company})` : `User ID: ${ownerId}`;
   };
 
   return (
@@ -613,7 +632,8 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
         </div>
       </div>
       
-      {/* Live Market Feed (NO CLICKING) */}
+      {/* Removed Quick Actions Grid (Compliance Check / View History) for Admin */}
+
       <div className="pt-4 border-t border-slate-700">
         <div className="flex justify-between mb-4">
             <h3 className="text-xl font-bold text-white flex items-center"><Eye className="w-6 h-6 mr-2 text-amber-400" /> Live Market Feed</h3>
@@ -625,7 +645,6 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory }) => {
                     <div><h4 className="text-lg font-bold text-white">{item.projectTitle || item.rfqName}</h4><p className="text-sm text-slate-400"><MapPin className="w-3 h-3 inline"/> {item.projectLocation} • <Calendar className="w-3 h-3 inline"/> {item.contractDuration}</p></div>
                     <div className="text-right"><div className="text-xl font-bold text-green-400">{getCompliancePercentage(item)}%</div><span className="text-slate-500 text-xs">{new Date(item.timestamp).toLocaleDateString()}</span></div>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                     <p className="text-xs text-green-400 font-bold"><DollarSign className="w-3 h-3 inline"/> {item.grandTotalValue}</p>
                     <p className="text-xs text-red-400 font-bold"><Activity className="w-3 h-3 inline"/> {item.primaryRisk}</p>
@@ -709,7 +728,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener ---
+    // --- EFFECT 1: Auth State Listener (Smart Redirect) ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -720,7 +739,7 @@ const App = () => {
                     const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
                     setCurrentUser({ uid: user.uid, ...userData });
                     
-                    // SMART REDIRECT
+                    // SMART REDIRECT: ADMIN -> ADMIN DASHBOARD, USER -> CHECKER
                     if (userData.role === 'ADMIN') {
                         setCurrentPage(PAGE.ADMIN);
                     } else {
