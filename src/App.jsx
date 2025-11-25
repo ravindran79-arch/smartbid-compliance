@@ -32,9 +32,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONSTANTS ---
+// SECURITY UPDATE: Point to our own backend proxy instead of Google directly.
 const API_URL = '/api/analyze'; 
+
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
-const MAX_FREE_AUDITS = 3; 
+const MAX_FREE_AUDITS = 3; // HARD LIMIT for Non-Admins
 
 const PAGE = {
     HOME: 'HOME',
@@ -62,28 +64,10 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         "techKeywords": { "type": "STRING", "description": "Top 3 technologies/materials." },
         "requiredCertifications": { "type": "STRING", "description": "Mandatory certs (ISO, etc.)." },
 
-        // --- NEW STRATEGIC METRICS ---
-        "buyingPersona": { 
-            "type": "STRING", 
-            "description": "Classify the Buyer's psychology based on the RFQ tone. Options: 'PRICE-DRIVEN' (Focus on budget caps, L1) or 'VALUE-DRIVEN' (Focus on quality, partnership, innovation)." 
-        },
-        "complexityScore": { 
-            "type": "STRING", 
-            "description": "Rate the project complexity from 1/10 to 10/10 based on scope, timeline tightness, and technical requirements." 
-        },
-        "trapCount": { 
-            "type": "STRING", 
-            "description": "Count the number of dangerous clauses found (e.g., Liquidated Damages, Unlimited Liability). Output format: 'X Critical Traps'." 
-        },
-        "leadTemperature": { 
-            "type": "STRING", 
-            "description": "Assess the probability of winning based on the Bidder's match to requirements. Options: 'HOT LEAD' (High Match), 'WARM LEAD' (Medium), 'COLD LEAD' (Low)." 
-        },
-
         // --- USER COACHING FIELDS ---
         "generatedExecutiveSummary": {
             "type": "STRING",
-            "description": "Write a comprehensive Executive Summary. MANDATORY STRUCTURE: 1. Clearly state the Project Background/Requirement found in the RFQ (e.g. 'Regarding the Client's need for X...'). 2. State the Vendor's Proposed Solution. 3. State the Vendor's key value proposition."
+            "description": "Write a comprehensive Executive Summary. MANDATORY STRUCTURE: 1. Clearly state the Project Background/Requirement found in the RFQ (e.g. 'Regarding the Client's need for X...'). 2. State the Vendor's Proposed Solution. 3. State the Vendor's key value proposition. Ensure the tone is professional and bridges the gap between Requirement and Offer."
         },
         "persuasionScore": {
             "type": "NUMBER",
@@ -133,7 +117,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
             }
         }
     },
-    "required": ["projectTitle", "rfqScopeSummary", "grandTotalValue", "industryTag", "buyingPersona", "complexityScore", "trapCount", "leadTemperature", "primaryRisk", "generatedExecutiveSummary", "persuasionScore", "toneAnalysis", "procurementVerdict", "legalRiskAlerts", "submissionChecklist", "executiveSummary", "findings"]
+    "required": ["projectTitle", "rfqScopeSummary", "grandTotalValue", "industryTag", "primaryRisk", "generatedExecutiveSummary", "persuasionScore", "toneAnalysis", "procurementVerdict", "legalRiskAlerts", "submissionChecklist", "executiveSummary", "findings"]
 };
 
 // --- UTILS ---
@@ -580,13 +564,11 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
   useEffect(() => {
     getDocs(collection(getFirestore(), 'users')).then(snap => setUserList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
-  
   const exportToCSV = (data, filename) => {
-    if (!data || !data.length) return;
     const csvContent = "data:text/csv;charset=utf-8," + Object.keys(data[0]).join(",") + "\n" + data.map(e => Object.values(e).map(v => `"${v}"`).join(",")).join("\n");
     const link = document.createElement("a"); link.href = encodeURI(csvContent); link.download = filename; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
-
+  
   const handleVendorExport = () => {
       const cleanVendorData = userList.map(u => ({
           "Full Name": u.name || '',
@@ -598,7 +580,7 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
       }));
       exportToCSV(cleanVendorData, 'vendor_registry.csv');
   };
-
+  
   const handleMarketExport = () => {
       const cleanMarketData = reportsHistory.map(r => ({
           ID: r.id,
@@ -621,9 +603,13 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
       exportToCSV(cleanMarketData, 'market_data.csv');
   };
 
+  const getUserForReport = (ownerId) => {
+    const found = userList.find(u => u.id === ownerId);
+    return found ? `${found.name} (${found.company})` : `User ID: ${ownerId}`;
+  };
+
   return (
     <div id="admin-print-area" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 space-y-8">
-      {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-700 pb-4">
         <h2 className="text-3xl font-bold text-white flex items-center"><Shield className="w-8 h-8 mr-3 text-red-400" /> Admin Market Intel</h2>
         <div className="flex space-x-3 no-print">
@@ -631,8 +617,6 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
             <button onClick={() => setCurrentPage('HOME')} className="text-sm text-slate-400 hover:text-amber-500 flex items-center"><ArrowLeft className="w-4 h-4 mr-1" /> Logout</button>
         </div>
       </div>
-      
-      {/* Removed Quick Actions Grid (Compliance Check / View History) for Admin */}
 
       <div className="pt-4 border-t border-slate-700">
         <div className="flex justify-between mb-4">
@@ -649,61 +633,27 @@ const AdminDashboard = ({ setCurrentPage, currentUser, reportsHistory, loadRepor
                     <p className="text-xs text-green-400 font-bold"><DollarSign className="w-3 h-3 inline"/> {item.grandTotalValue}</p>
                     <p className="text-xs text-red-400 font-bold"><Activity className="w-3 h-3 inline"/> {item.primaryRisk}</p>
                 </div>
-
-                {/* NEW METRICS DISPLAY */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-700/50">
-                    <div>
-                        <p className="text-xs font-bold text-blue-300">{item.buyingPersona || 'N/A'}</p>
-                        <p className="text-[10px] text-slate-500">Buyer Priority</p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-bold text-purple-300">{item.complexityScore || 'N/A'}</p>
-                        <p className="text-[10px] text-slate-500">Complexity</p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-bold text-orange-300">{item.trapCount || 'N/A'}</p>
-                        <p className="text-[10px] text-slate-500">Risk Traps</p>
-                    </div>
-                    <div>
-                        <p className="text-xs font-bold text-pink-300">{item.leadTemperature || 'N/A'}</p>
-                        <p className="text-[10px] text-slate-500">Win Prob.</p>
-                    </div>
+                    <div><p className="text-xs font-bold text-blue-300">{item.buyingPersona || 'N/A'}</p><p className="text-[10px] text-slate-500">Buyer Priority</p></div>
+                    <div><p className="text-xs font-bold text-purple-300">{item.complexityScore || 'N/A'}</p><p className="text-[10px] text-slate-500">Complexity</p></div>
+                    <div><p className="text-xs font-bold text-orange-300">{item.trapCount || 'N/A'}</p><p className="text-[10px] text-slate-500">Risk Traps</p></div>
+                    <div><p className="text-xs font-bold text-pink-300">{item.leadTemperature || 'N/A'}</p><p className="text-[10px] text-slate-500">Win Prob.</p></div>
                 </div>
             </div>
         ))}</div>
       </div>
-
-      {/* Vendor Registry (TABLE LAYOUT FIX) */}
       <div className="pt-4 border-t border-slate-700">
          <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-white"><Users className="w-5 h-5 mr-2 text-blue-400" /> Vendor Registry</h3><button onClick={handleVendorExport} className="text-xs bg-blue-700 text-white px-3 py-1 rounded no-print"><Download className="w-3 h-3 mr-1"/> CSV</button></div>
-         <div className="max-h-96 overflow-y-auto bg-slate-900 rounded-xl border border-slate-700">
+         <div className="max-h-64 overflow-y-auto bg-slate-900 rounded-xl border border-slate-700 p-4 space-y-4">
             <table className="w-full text-left text-sm text-slate-400">
                 <thead className="bg-slate-800 text-slate-200 uppercase font-bold sticky top-0 z-10">
-                    <tr>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Designation</th>
-                        <th className="px-4 py-3">Company</th>
-                        <th className="px-4 py-3">Email</th>
-                        <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3 text-right">Role</th>
-                    </tr>
+                    <tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Designation</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3 text-right">Role</th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
-                    {userList.map((user, i) => (
-                        <tr key={i} className="hover:bg-slate-800/50 transition">
-                            <td className="px-4 py-3 font-medium text-white">{user.name}</td>
-                            <td className="px-4 py-3">{user.designation}</td>
-                            <td className="px-4 py-3">{user.company}</td>
-                            <td className="px-4 py-3">{user.email}</td>
-                            <td className="px-4 py-3">{user.phone || 'N/A'}</td>
-                            <td className="px-4 py-3 text-right">
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${user.role === 'ADMIN' ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
-                                    {user.role}
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
+                <tbody className="divide-y divide-slate-800">{userList.map((user, i) => (
+                    <tr key={i} className="hover:bg-slate-800/50 transition">
+                        <td className="px-4 py-3 font-medium text-white">{user.name}</td><td className="px-4 py-3">{user.designation}</td><td className="px-4 py-3">{user.company}</td><td className="px-4 py-3">{user.email}</td><td className="px-4 py-3">{user.phone || 'N/A'}</td><td className="px-4 py-3 text-right"><span className={`px-2 py-1 rounded text-xs font-bold ${user.role === 'ADMIN' ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>{user.role}</span></td>
+                    </tr>
+                ))}</tbody>
             </table>
          </div>
       </div>
@@ -728,7 +678,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    // --- EFFECT 1: Auth State Listener (Smart Redirect) ---
+    // --- EFFECT 1: Auth State Listener ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -738,13 +688,7 @@ const App = () => {
                     const userDoc = await getDoc(doc(db, 'users', user.uid));
                     const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
                     setCurrentUser({ uid: user.uid, ...userData });
-                    
-                    // SMART REDIRECT: ADMIN -> ADMIN DASHBOARD, USER -> CHECKER
-                    if (userData.role === 'ADMIN') {
-                        setCurrentPage(PAGE.ADMIN);
-                    } else {
-                        setCurrentPage(PAGE.COMPLIANCE_CHECK);
-                    }
+                    if (userData.role === 'ADMIN') { setCurrentPage(PAGE.ADMIN); } else { setCurrentPage(PAGE.COMPLIANCE_CHECK); }
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
                     setCurrentUser({ uid: user.uid, role: 'USER' });
