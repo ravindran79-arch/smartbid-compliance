@@ -235,7 +235,7 @@ const PaywallModal = ({ show, onClose }) => {
                 <h2 className="text-2xl font-bold text-white mt-8 mb-2">Trial Limit Reached</h2>
                 <p className="text-slate-300 mb-6">
                     You have used your <span className="text-amber-400 font-bold">3 Free Audits</span>.
-                    <br/>To continue winning bids, upgrade to Pro.
+                    <br/>To continue further audits on SmartBids, upgrade to Pro.
                 </p>
                 <div className="bg-slate-700/50 rounded-xl p-4 mb-6 text-left space-y-3">
                     <div className="flex items-center text-sm text-white"><CheckCircle className="w-4 h-4 mr-3 text-green-400"/> Unlimited Compliance Audits</div>
