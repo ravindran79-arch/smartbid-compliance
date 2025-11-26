@@ -232,7 +232,7 @@ const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
 const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
     
-    // ✅ STRIPE LINK (CONSTITUTION COMPLIANT)
+    // ✅ FINAL STRIPE LINK
     const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_cNi00i4JHdOmdTT8VJafS00"; 
 
     const handleUpgrade = () => {
@@ -244,7 +244,7 @@ const PaywallModal = ({ show, onClose, userId }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">
             <div className="bg-slate-800 rounded-2xl shadow-2xl border border-amber-500/50 max-w-md w-full p-8 text-center relative">
                 <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-amber-500 rounded-full p-4 shadow-lg shadow-amber-500/50">
                     <Lock className="w-10 h-10 text-white" />
@@ -311,7 +311,7 @@ const MetricPill = ({ label, count, color }) => (
 );
 
 const FileUploader = ({ title, file, setFile, color, requiredText }) => (
-    <div className={`p-6 border-2 border-dashed border-${color}-600/50 rounded-2xl bg-slate-900/50 space-y-3`}>
+    <div className={`p-6 border-2 border-dashed border-${color}-600/50 rounded-2xl bg-slate-900/50 space-y-3 no-print`}>
         <h3 className={`text-lg font-bold text-${color}-400 flex items-center`}><FileUp className={`w-6 h-6 mr-2 text-${color}-500`} /> {title}</h3>
         <p className="text-sm text-slate-400">{requiredText}</p>
         <input type="file" accept=".txt,.pdf,.docx" onChange={setFile} className="w-full text-base text-slate-300"/>
@@ -328,11 +328,28 @@ const ComplianceReport = ({ report }) => {
     const getWidth = (flag) => findings.length === 0 ? '0%' : `${(counts[flag] / findings.length) * 100}%`;
 
     return (
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 mt-8">
-            <h2 className="text-3xl font-extrabold text-white flex items-center mb-6 border-b border-slate-700 pb-4"><List className="w-6 h-6 mr-3 text-amber-400"/> Comprehensive Compliance Report</h2>
+        <div id="printable-compliance-report" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 mt-8">
+            <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                <h2 className="text-3xl font-extrabold text-white flex items-center"><List className="w-6 h-6 mr-3 text-amber-400"/> Comprehensive Compliance Report</h2>
+                <button 
+                    onClick={() => window.print()} 
+                    className="text-sm text-slate-400 hover:text-white bg-slate-700 px-3 py-2 rounded-lg flex items-center no-print"
+                >
+                    <Printer className="w-4 h-4 mr-2"/> Print / PDF
+                </button>
+            </div>
+
             {report.generatedExecutiveSummary && (
                 <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/40 to-slate-800 rounded-xl border border-blue-500/30">
-                    <h3 className="text-xl font-bold text-blue-200 mb-3 flex items-center"><Award className="w-5 h-5 mr-2 text-yellow-400"/> AI-Suggested Executive Summary</h3>
+                    <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-xl font-bold text-blue-200 flex items-center"><Award className="w-5 h-5 mr-2 text-yellow-400"/> AI-Suggested Executive Summary</h3>
+                        <button 
+                            onClick={() => navigator.clipboard.writeText(report.generatedExecutiveSummary)}
+                            className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded transition no-print"
+                        >
+                            <Copy className="w-3 h-3 mr-1"/> Copy Text
+                        </button>
+                    </div>
                     <p className="text-slate-300 italic leading-relaxed border-l-4 border-blue-500 pl-4 whitespace-pre-line">"{report.generatedExecutiveSummary}"</p>
                 </div>
             )}
@@ -479,7 +496,7 @@ const ReportHistory = ({ reportsHistory, loadReportFromHistory, isAuthReady, use
     );
 };
 
-// --- PAGE COMPONENTS (Defined BEFORE App) ---
+// --- PAGE COMPONENTS (AuthPage First) ---
 
 const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) => {
     const [regForm, setRegForm] = useState({ name: '', designation: '', company: '', email: '', phone: '', password: '' });
@@ -524,7 +541,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            // No direct navigation here; App effect handles it
+            // No direct navigation here; App effect handles role-based redirect
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -715,7 +732,7 @@ const App = () => {
         setErrorMessage(null);
     };
 
-    // --- EFFECT 1: Auth State Listener ---
+    // --- EFFECT 1: Auth State Listener (Smart Redirect) ---
     useEffect(() => {
         if (!auth) return;
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -726,7 +743,7 @@ const App = () => {
                     const userData = userDoc.exists() ? userDoc.data() : { role: 'USER' };
                     setCurrentUser({ uid: user.uid, ...userData });
                     
-                    // SMART REDIRECT
+                    // SMART REDIRECT: ADMIN -> ADMIN DASHBOARD, USER -> CHECKER
                     if (userData.role === 'ADMIN') {
                         setCurrentPage(PAGE.ADMIN);
                     } else {
@@ -738,8 +755,8 @@ const App = () => {
                     setCurrentPage(PAGE.COMPLIANCE_CHECK);
                 }
             } else {
-                // Fallback if auth state clears unexpectedly, though handleLogout does the heavy lifting
-                setCurrentPage(PAGE.HOME);
+                // FIX: WIPE STATE ON LOGOUT
+                setUserId(null); setCurrentUser(null); setReportsHistory([]); setReport(null); setRFQFile(null); setBidFile(null); setCurrentPage(PAGE.HOME);
             }
             setIsAuthReady(true);
         });
@@ -794,7 +811,7 @@ const App = () => {
         return () => unsubscribeSnapshot && unsubscribeSnapshot();
     }, [userId, currentUser]);
 
-// --- EFFECT 4: Load Libraries & Check Payment ---
+    // --- EFFECT 4: Load Libraries (Robust Check) ---
     useEffect(() => {
         const loadScript = (src) => {
             return new Promise((resolve, reject) => {
@@ -815,16 +832,12 @@ const App = () => {
         };
         loadAllLibraries();
         
-        // --- PAYMENT SUCCESS HANDLER ---
+        // FIX: CHECK FOR PAYMENT SUCCESS REDIRECT
         const params = new URLSearchParams(window.location.search);
-        // 1. Check for the flag we set in Stripe
-        if (params.get('payment_success') === 'true') {
-             // 2. Show the "Pro Mode" Celebration Banner
-             setErrorMessage("🏆 SUCCESS: Payment Received! You are now in SmartBids Pro Mode.");
-             // 3. Clean the URL so the user doesn't see the query param
+        if (params.get('client_reference_id') || params.get('payment_success')) {
              window.history.replaceState({}, document.title, "/");
         }
-    }, []);
+    }, []); 
 
     const incrementUsage = async () => {
         if (!db || !userId) return;
