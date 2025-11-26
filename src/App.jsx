@@ -215,8 +215,23 @@ const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
     </div>
 );
 
-const PaywallModal = ({ show, onClose }) => {
+// --- UPDATED PAYWALL MODAL ---
+const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
+
+    // ✅ YOUR REAL STRIPE LINK IS HERE
+    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_cNi00i4JHdOmdTT8VJafS00"; 
+
+    const handleUpgrade = () => {
+        // We append the userId to the URL so Stripe knows exactly WHO is paying.
+        // This allows the system to automatically unlock the account later.
+        if (userId) {
+            window.location.href = `${STRIPE_PAYMENT_LINK}?client_reference_id=${userId}`;
+        } else {
+            alert("Error: User ID missing. Please log in again.");
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-slate-800 rounded-2xl shadow-2xl border border-amber-500/50 max-w-md w-full p-8 text-center relative">
@@ -234,7 +249,7 @@ const PaywallModal = ({ show, onClose }) => {
                     <div className="flex items-center text-sm text-white"><CheckCircle className="w-4 h-4 mr-3 text-green-400"/> Market Intelligence Data</div>
                 </div>
                 <button 
-                    onClick={() => alert("Stripe Integration is coming in the next update!")}
+                    onClick={handleUpgrade}
                     className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl transition-all shadow-lg mb-3 flex items-center justify-center"
                 >
                     <CreditCard className="w-5 h-5 mr-2"/> Upgrade Now - $10/mo
@@ -959,7 +974,7 @@ const App = () => {
                 @media print { body * { visibility: hidden; } #admin-print-area, #admin-print-area * { visibility: visible; } #admin-print-area { position: absolute; left: 0; top: 0; width: 100%; background: white; color: black; } .no-print { display: none; } }
             `}</style>
             <div className="max-w-4xl mx-auto space-y-10">{renderPage()}</div>
-            <PaywallModal show={showPaywall} onClose={() => setShowPaywall(false)} />
+           <PaywallModal show={showPaywall} onClose={() => setShowPaywall(false)} userId={userId} />
         </div>
     );
 };
