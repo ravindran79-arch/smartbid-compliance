@@ -512,7 +512,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
             await signOut(auth);
             
             setLoginForm({ email: regForm.email, password: regForm.password });
-            setErrorMessage('SUCCESS: Registration complete! Credentials autofilled. Please Sign In below.');
+            setErrorMessage('SUCCESS: Registration complete! Use the Email/Password you just created to Sign In.');
         } catch (err) {
             console.error('Registration error', err);
             setErrorMessage(err.message || 'Registration failed.');
