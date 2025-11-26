@@ -32,7 +32,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONSTANTS ---
-const API_URL = '/api/analyze'; // Proxy Server (Bodyguard Principle)
+// SECURITY UPDATE: Point to our own backend proxy instead of Google directly.
+const API_URL = '/api/analyze'; 
+
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
 const MAX_FREE_AUDITS = 3; 
 
@@ -83,7 +85,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         // --- USER COACHING FIELDS ---
         "generatedExecutiveSummary": {
             "type": "STRING",
-            "description": "Write a professional 2-PARAGRAPH Executive Summary. PARAGRAPH 1: Mirror the RFQ. Explicitly restate the Client's primary objectives and pain points. PARAGRAPH 2: Validate the Bidder's specific suitability (USP, Tech, Experience). If the bid lacks a USP, highlight this gap."
+            "description": "Write a professional 2-PARAGRAPH Executive Summary. PARAGRAPH 1: Mirror the RFQ context. Explicitly restate the Client's project goals and pain points. PARAGRAPH 2: Validate the Bidder's specific suitability (USP, Tech, Experience). If the bid lacks a USP, highlight this gap."
         },
         "persuasionScore": { "type": "NUMBER", "description": "Score 0-100 based on confidence and clarity." },
         "toneAnalysis": { "type": "STRING" },
@@ -477,7 +479,7 @@ const ReportHistory = ({ reportsHistory, loadReportFromHistory, isAuthReady, use
     );
 };
 
-// --- PAGE COMPONENTS (AuthPage First) ---
+// --- PAGE COMPONENTS (Defined BEFORE App) ---
 
 const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) => {
     const [regForm, setRegForm] = useState({ name: '', designation: '', company: '', email: '', phone: '', password: '' });
@@ -503,7 +505,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
                 createdAt: Date.now()
             });
             
-            // CONSTITUTION: Immediately sign out to prevent auto-redirect
+            // FIX: Sign Out immediately to prevent auto-redirect
             await signOut(auth);
             
             setLoginForm({ email: regForm.email, password: regForm.password });
@@ -522,7 +524,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            // Navigation handled by App's Auth Listener
+            // No direct navigation here; App effect handles it
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -853,10 +855,12 @@ const App = () => {
                     1. EXTRACT 'projectTitle', 'grandTotalValue', 'primaryRisk', 'rfqScopeSummary'.
                     2. EXTRACT 'projectLocation', 'contractDuration', 'techKeywords', 'requiredCertifications'.
                     3. CLASSIFY 'industryTag': STRICTLY choose one: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'.
-                    4. CLASSIFY 'buyingPersona': 'PRICE-DRIVEN' or 'VALUE-DRIVEN'.
-                    5. SCORE 'complexityScore': 1-10 (String).
-                    6. COUNT 'trapCount': Number of dangerous clauses.
-                    7. ASSESS 'leadTemperature': 'HOT LEAD', 'WARM LEAD', or 'COLD LEAD'.
+                    
+                    // --- NEW STRATEGIC METRICS ---
+                    4. CLASSIFY 'buyingPersona': 'PRICE-DRIVEN' or 'VALUE-DRIVEN' based on RFQ tone.
+                    5. SCORE 'complexityScore': 1-10 (String format e.g. '8/10').
+                    6. COUNT 'trapCount': Number of dangerous clauses (e.g. '3 Critical Traps').
+                    7. ASSESS 'leadTemperature': 'HOT LEAD', 'WARM LEAD', or 'COLD LEAD' based on win probability.
 
                     **TASK 2: Bid Coaching**
                     1. GENERATE 'generatedExecutiveSummary': MANDATORY: Start by referencing the specific Project Background from the RFQ, then transition to the Vendor's solution and value proposition.
@@ -958,7 +962,7 @@ const App = () => {
             case PAGE.COMPLIANCE_CHECK:
                 return <AuditPage 
                     title="Bidder: Self-Compliance Check" rfqTitle="RFQ" bidTitle="Bid" role="BIDDER"
-                    handleAnalyze={handleAnalyze} usageLimits={usageLimits.bidderChecks} setCurrentPage={setCurrentPage}
+                    handleAnalyze={handleAnalyze} usageLimits={usageLimits} setCurrentPage={setCurrentPage}
                     currentUser={currentUser} loading={loading} RFQFile={RFQFile} BidFile={BidFile}
                     setRFQFile={setRFQFile} setBidFile={setBidFile} generateTestData={generateTestData} 
                     errorMessage={errorMessage} report={report} saveReport={saveReport} saving={saving}
