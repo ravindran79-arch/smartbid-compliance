@@ -232,7 +232,7 @@ const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
     
     // 🚨 YOUR LIVE STRIPE LINK 🚨
-    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_cNi00i4JHdOmdTT8VJafS00"; 
+    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/cNi00i4JHdOmdTT8VJafS00"; 
 
     const handleUpgrade = () => {
         if (userId) {
