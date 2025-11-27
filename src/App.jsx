@@ -231,15 +231,10 @@ const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
 const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
     
-    // 🚨 PASTE YOUR LIVE LINK BELOW 🚨
-    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/4gT..."; 
+    // ✅ STRIPE LINK
+    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_cNi00i4JHdOmdTT8VJafS00"; 
 
     const handleUpgrade = () => {
-        if(STRIPE_PAYMENT_LINK.includes("PASTE_YOUR") || STRIPE_PAYMENT_LINK.includes("4gT...")) {
-            alert("Developer: Please paste the real Stripe Link in src/App.jsx line ~240");
-            return;
-        }
-        
         if (userId) {
             window.location.href = `${STRIPE_PAYMENT_LINK}?client_reference_id=${userId}`;
         } else {
@@ -335,7 +330,6 @@ const ComplianceReport = ({ report }) => {
         <div id="printable-compliance-report" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 mt-8">
             <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <h2 className="text-3xl font-extrabold text-white flex items-center"><List className="w-6 h-6 mr-3 text-amber-400"/> Comprehensive Compliance Report</h2>
-                {/* PRINT BUTTON */}
                 <button 
                     onClick={() => window.print()} 
                     className="text-sm text-slate-400 hover:text-white bg-slate-700 px-3 py-2 rounded-lg flex items-center no-print"
@@ -348,7 +342,6 @@ const ComplianceReport = ({ report }) => {
                 <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/40 to-slate-800 rounded-xl border border-blue-500/30">
                     <div className="flex justify-between items-start mb-3">
                         <h3 className="text-xl font-bold text-blue-200 flex items-center"><Award className="w-5 h-5 mr-2 text-yellow-400"/> AI-Suggested Executive Summary</h3>
-                        {/* COPY BUTTON */}
                         <button 
                             onClick={() => navigator.clipboard.writeText(report.generatedExecutiveSummary)}
                             className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded transition no-print"
@@ -685,7 +678,25 @@ const AuditPage = ({ title, handleAnalyze, usageLimits, setCurrentPage, currentU
                     <h2 className="text-2xl font-bold text-white">{title}</h2>
                     <div className="text-right">
                         {currentUser?.role === 'ADMIN' ? <p className="text-xs text-green-400 font-bold">Admin Mode: Unlimited</p> : 
-                         usageLimits.isSubscribed ? <p className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500 text-amber-400 text-xs font-bold inline-flex items-center"><Award className="w-3 h-3 mr-1" /> SmartBids Pro Mode</p> :
+                         usageLimits.isSubscribed ? (
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        const res = await fetch('/api/create-portal-session', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ userId })
+                                        });
+                                        const data = await res.json();
+                                        if (data.url) window.location.href = data.url;
+                                        else alert("Could not access billing portal. " + (data.error || ""));
+                                    } catch (e) { console.error(e); alert("Connection failed."); }
+                                }}
+                                className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500 text-amber-400 text-xs font-bold inline-flex items-center hover:bg-amber-500/30 transition"
+                            >
+                                <Award className="w-3 h-3 mr-1" /> Manage Subscription
+                            </button>
+                         ) :
                          <p className="text-xs text-slate-400">Audits Used: <span className={usageLimits.bidderChecks >= MAX_FREE_AUDITS ? "text-red-500" : "text-green-500"}>{usageLimits.bidderChecks}/{MAX_FREE_AUDITS}</span></p>}
                         <button onClick={handleLogout} className="text-sm text-slate-400 hover:text-amber-500 block ml-auto mt-1">Logout</button>
                     </div>
