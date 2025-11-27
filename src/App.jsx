@@ -55,7 +55,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         "grandTotalValue": { "type": "STRING", "description": "Total Bid Price/Cost." },
         "industryTag": { 
             "type": "STRING", 
-            "description": "STRICTLY classify into ONE: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'."
+            "description": "STRICTLY classify into ONE of these exact categories: 'Energy / Oil & Gas', 'Construction / Infrastructure', 'IT / SaaS / Technology', 'Healthcare / Medical', 'Logistics / Supply Chain', 'Consulting / Professional Services', 'Manufacturing / Industrial', 'Financial Services', or 'Other'."
         },
         "primaryRisk": { "type": "STRING", "description": "Biggest deal-breaker risk." },
         "projectLocation": { "type": "STRING", "description": "Geographic location." },
@@ -231,8 +231,8 @@ const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
 const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
     
-    // 🚨 YOUR LIVE STRIPE LINK 🚨
-    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/cNi00i4JHdOmdTT8VJafS00"; 
+    // ✅ STRIPE LINK
+    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/test_cNi00i4JHdOmdTT8VJafS00"; 
 
     const handleUpgrade = () => {
         if (userId) {
@@ -570,6 +570,30 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <UserPlus className="h-5 w-5 mr-2" />}
                             {isSubmitting ? 'Registering...' : 'Register'}
                         </button>
+
+                        {/* --- LEGAL DISCLAIMER --- */}
+                        <div className="mt-4 text-[10px] text-slate-500 text-center leading-tight">
+                            By registering, you agree to our 
+                            <a 
+                                href="https://img1.wsimg.com/blobby/go/e7a89444-89f8-4812-8ce7-eba19bcc7358/downloads/fa06a071-2930-49be-a04e-de1ca9d015c5/TERMS%20OF%20SERVICE%20(SmartBids).pdf?ver=1764277948129" 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-blue-400 hover:underline mx-1"
+                            >
+                                Terms of Service
+                            </a>
+                            and 
+                            <a 
+                                href="https://img1.wsimg.com/blobby/go/e7a89444-89f8-4812-8ce7-eba19bcc7358/downloads/34bedb1f-7818-40f1-9435-cc51328ba40f/PRIVACY%20POLICY%20(SmartBids).pdf?ver=1764277948129" 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-blue-400 hover:underline mx-1"
+                            >
+                                Privacy Policy
+                            </a>.
+                        </div>
+                        {/* -------------------------- */}
+
                     </form>
                 </div>
 
@@ -864,7 +888,9 @@ const App = () => {
         // FIX: CHECK FOR PAYMENT SUCCESS REDIRECT
         const params = new URLSearchParams(window.location.search);
         if (params.get('client_reference_id') || params.get('payment_success')) {
+             // Clean URL
              window.history.replaceState({}, document.title, "/");
+             // Optional: Could set a success message state here if desired
         }
     }, []); 
 
