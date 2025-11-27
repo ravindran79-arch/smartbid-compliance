@@ -32,7 +32,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONSTANTS ---
-// SECURITY UPDATE: Point to our own backend proxy instead of Google directly.
 const API_URL = '/api/analyze'; 
 
 const CATEGORY_ENUM = ["LEGAL", "FINANCIAL", "TECHNICAL", "TIMELINE", "REPORTING", "ADMINISTRATIVE", "OTHER"];
@@ -85,7 +84,7 @@ const COMPREHENSIVE_REPORT_SCHEMA = {
         // --- USER COACHING FIELDS ---
         "generatedExecutiveSummary": {
             "type": "STRING",
-            "description": "Write a professional 2-PARAGRAPH Executive Summary. PARAGRAPH 1: Mirror the RFQ context. Explicitly restate the Client's project goals and pain points. PARAGRAPH 2: Validate the Bidder's specific suitability (USP, Tech, Experience). If the bid lacks a USP, highlight this gap."
+            "description": "Write a professional 2-PARAGRAPH Executive Summary. PARAGRAPH 1: Mirror the RFQ context. Explicitly restate the Client's primary objectives and pain points. PARAGRAPH 2: Validate the Bidder's specific suitability (USP, Tech, Experience). If the bid lacks a USP, highlight this gap."
         },
         "persuasionScore": { "type": "NUMBER", "description": "Score 0-100 based on confidence and clarity." },
         "toneAnalysis": { "type": "STRING" },
@@ -232,10 +231,15 @@ const FormInput = ({ label, name, value, onChange, type, placeholder, id }) => (
 const PaywallModal = ({ show, onClose, userId }) => {
     if (!show) return null;
     
-    // ✅ FINAL STRIPE LINK
-    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/cNi00i4JHdOmdTT8VJafS00"; 
+    // 🚨 PASTE YOUR LIVE LINK BELOW 🚨
+    const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/4gT..."; 
 
     const handleUpgrade = () => {
+        if(STRIPE_PAYMENT_LINK.includes("PASTE_YOUR") || STRIPE_PAYMENT_LINK.includes("4gT...")) {
+            alert("Developer: Please paste the real Stripe Link in src/App.jsx line ~240");
+            return;
+        }
+        
         if (userId) {
             window.location.href = `${STRIPE_PAYMENT_LINK}?client_reference_id=${userId}`;
         } else {
@@ -331,6 +335,7 @@ const ComplianceReport = ({ report }) => {
         <div id="printable-compliance-report" className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 mt-8">
             <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <h2 className="text-3xl font-extrabold text-white flex items-center"><List className="w-6 h-6 mr-3 text-amber-400"/> Comprehensive Compliance Report</h2>
+                {/* PRINT BUTTON */}
                 <button 
                     onClick={() => window.print()} 
                     className="text-sm text-slate-400 hover:text-white bg-slate-700 px-3 py-2 rounded-lg flex items-center no-print"
@@ -343,6 +348,7 @@ const ComplianceReport = ({ report }) => {
                 <div className="mb-8 p-6 bg-gradient-to-r from-blue-900/40 to-slate-800 rounded-xl border border-blue-500/30">
                     <div className="flex justify-between items-start mb-3">
                         <h3 className="text-xl font-bold text-blue-200 flex items-center"><Award className="w-5 h-5 mr-2 text-yellow-400"/> AI-Suggested Executive Summary</h3>
+                        {/* COPY BUTTON */}
                         <button 
                             onClick={() => navigator.clipboard.writeText(report.generatedExecutiveSummary)}
                             className="text-xs flex items-center bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded transition no-print"
@@ -541,7 +547,7 @@ const AuthPage = ({ setCurrentPage, setErrorMessage, errorMessage, db, auth }) =
         setIsSubmitting(true);
         try {
             await signInWithEmailAndPassword(auth, loginForm.email, loginForm.password);
-            // No direct navigation here; App effect handles role-based redirect
+            // No direct navigation here; App effect handles it
         } catch (err) {
             console.error('Login error', err);
             setErrorMessage(err.message || 'Login failed.');
@@ -887,7 +893,7 @@ const App = () => {
                     5. JUDGE 'procurementVerdict': List 3 'winningFactors' and 3 'losingFactors'.
                     6. ALERT 'legalRiskAlerts'.
                     7. CHECK 'submissionChecklist' (List artifacts).
-                    8. CLEAN UP TEXT: Fix any OCR/PDF spacing errors.
+                    8. CLEAN UP TEXT: Fix any OCR/PDF spacing errors (e.g. 'Veri fi cation' -> 'Verification').
 
                     **TASK 3: Compliance Audit**
                     1. Identify mandatory requirements.
@@ -995,15 +1001,13 @@ const App = () => {
 
     return (
         <div className="min-h-screen bg-slate-900 font-body p-4 sm:p-8 text-slate-100">
-<style>{`
+            <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
                 .font-body, .font-body * { font-family: 'Lexend', sans-serif !important; }
                 input[type="file"] { display: block; width: 100%; }
                 input[type="file"]::file-selector-button { background-color: #f59e0b; color: #1e293b; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; }
                 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 3px; }
-                
-                /* --- PRINT FIX --- */
                 @media print { 
                     body * { visibility: hidden; } /* Hide everything by default */
                     
@@ -1018,6 +1022,11 @@ const App = () => {
                     .no-print { display: none !important; } 
                 }
             `}</style>
+            <div className="max-w-4xl mx-auto space-y-10">{renderPage()}</div>
+            <PaywallModal show={showPaywall} onClose={() => setShowPaywall(false)} userId={userId} />
+        </div>
+    );
+};
 
 // --- TOP LEVEL EXPORT ---
 const MainApp = App;
